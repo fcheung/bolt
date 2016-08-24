@@ -1,5 +1,4 @@
 require "bolt/version"
-
+require 'bolt/pack_stream'
 module Bolt
-  # Your code goes here...
 end
