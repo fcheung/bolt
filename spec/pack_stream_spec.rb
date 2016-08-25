@@ -9,6 +9,16 @@ describe Bolt::PackStream do
       end
     end
 
+    describe 'booleans' do
+      it 'serializes true as 0xC3' do
+        expect(Bolt::PackStream.pack(true)).to match_hex('C3')
+      end
+
+      it 'serializes false as 0xC2' do
+        expect(Bolt::PackStream.pack(false)).to match_hex('C2')
+      end
+    end
+
     describe 'null' do
       it 'serializes nil as 0xC0' do
         expect(Bolt::PackStream.pack(nil)).to match_hex('C0')

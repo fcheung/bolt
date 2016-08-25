@@ -5,6 +5,8 @@ module Bolt
         case value
         when Integer then encode_integer(value)
         when nil then "\xC0"
+        when true then "\xC3"
+        when false then "\xC2"
         else
           raise ArgumentError, "value #{value} cannot be packstreamed"
         end
