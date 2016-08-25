@@ -160,5 +160,62 @@ describe Bolt::PackStream do
       end
     end
 
+    describe 'structures' do
+
+      it 'serializes a structure with <= 15 fields as B0..BF, signature byte, fields' do
+        a = Struct.new(:a, :b, :c) do
+          include Bolt::PackStream::Structure
+          def signature
+            100
+          end
+
+          def fields
+            to_a
+          end
+        end
+
+        expect(Bolt::PackStream.pack(a.new(1,2,"3"))).to match_hex('B3:64:01:02:81:33')
+      end
+
+      it 'serializes a structure with <= 255 fields as DC, unsigned byte length , signature byte, fields' do
+        a = Struct.new(*('a'..'p').to_a.collect(&:to_sym)) do
+          include Bolt::PackStream::Structure
+          def signature
+            100
+          end
+
+          def fields
+            to_a
+          end
+        end
+        expect(Bolt::PackStream.pack(a.new(*(1..16)))).to match_hex('DC:10:64:01:02:03:04:05:06:07:08:09:0A:0B:0C:0D:0E:0F:10')
+
+      end
+
+      it 'serializes a structure with <= 65535 fields as DD, 2 big endian unsigned byte length  , signature byte, fields' do
+        a = Class.new do
+          include Bolt::PackStream::Structure
+          def signature
+            100
+          end
+
+          def fields
+            [1]*256
+          end
+        end
+        expect(Bolt::PackStream.pack(a.new)).to match_hex('DD:01:00:64' + ':01'*256)
+
+      end
+
+      it 'raises on structure with > 65535 fields' do
+        a = Class.new do
+          include Bolt::PackStream::Structure
+          def fields
+            (1..65536)
+          end
+        end
+        expect {Bolt::PackStream.pack(a.new)}.to raise_error(ArgumentError)
+      end
+    end
   end
 end

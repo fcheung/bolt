@@ -1,5 +1,16 @@
 module Bolt
   module PackStream
+    
+    module Structure
+      def signature
+        raise UnimplementedError
+      end
+
+      def fields
+        raise UnimplementedError
+      end
+    end
+
     def self.pack(*values)
       values.map do |value|
         case value
@@ -9,6 +20,7 @@ module Bolt
         when Symbol then encode_string(value.to_s)
         when Array then encode_array(value)
         when Hash then encode_hash(value)
+        when Structure then encode_structure(value)
         when nil then "\xC0"
         when true then "\xC3"
         when false then "\xC2"
@@ -75,6 +87,19 @@ module Bolt
         raise ArgumentError, "String is too long (#{bytesize})"
       end
       leader + encoded.force_encoding('BINARY')
+    end
+
+    def self.encode_structure(struct)
+      fields = struct.fields
+      size = fields.size
+      leader = case size
+      when 0..15 then [0xB0 + size, struct.signature].pack('CC')
+      when 16..255 then [0xDC, size, struct.signature].pack('CCC')
+      when 256..65535 then [0xDD, size, struct.signature].pack('CS>C')
+      else
+        raise ArgumentError, "structure has too many fields (#{size})"
+      end
+      fields.inject(leader) {|buffer, item| buffer << pack(item)}
     end
   end
 end
