@@ -43,8 +43,10 @@ module Bolt
       else 
         raise ArgumentError, "Array is too long #{length}"
       end
-      leader + array.inject(''.force_encoding('BINARY')) {|buffer, item| buffer << pack(item)}
+      array.inject(leader) {|buffer, item| buffer << pack(item)}
     end
+
+    
 
     def self.encode_string(string)
       encoded = string.encode('utf-8')
