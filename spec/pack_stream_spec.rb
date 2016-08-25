@@ -97,6 +97,34 @@ describe Bolt::PackStream do
       end
     end
 
+    describe 'maps' do
+      it 'serializes <= 15 items to A0..AF followed by key value pairs' do
+        expect(Bolt::PackStream.pack({})).to match_hex('A0')
+        expect(Bolt::PackStream.pack({one: 'eins'})).to match_hex('A1:83:6F:6E:65:84:65:69:6E:73')
+      end
+
+      it 'serialises 16 to 255 items as D8 followed 1 unsigned byte length followed by key value pairs in any order' do
+        map = ('A'..'Z').zip(1..26).to_h
+        #our spec actually asserts order too
+        expect(Bolt::PackStream.pack(map)).to match_hex('D8:1A:81:41:01:81:42:02:81:43:03:81:44:04:81:45:05:81:46:06:81:47:07:81:48:08:81:49:09:81:4A:0A:81:4B:0B:81:4C:0C:81:4D:0D:81:4E:0E:81:4F:0F:81:50:10:81:51:11:81:52:12:81:53:13:81:54:14:81:55:15:81:56:16:81:57:17:81:58:18:81:59:19:81:5A:1A')
+      end
+
+      it 'serialises 256 to 65535 items as D9 followed big endian 2 unsigned byte length followed by key value pairs' do
+        map = (1..256).zip(['1']*256).to_h
+        expect(Bolt::PackStream.pack(map)[0,9]).to match_hex('D9:01:00:01:81:31:02:81:31')
+      end
+
+      it 'serialises 65536 to  4294967295 items as DA followed big endian 4 unsigned byte length followed by key value pairs' do
+        map = (1..65536).zip(['1']*65536).to_h
+        expect(Bolt::PackStream.pack(map)[0,11]).to match_hex('DA:00:01:00:00' + ':01:81:31:02:81:31' )
+      end
+
+      it "raises error if size >= 2^32 " do
+        expect {Bolt::PackStream.pack(instance_double(Hash, size: 2**32))}.to raise_error(ArgumentError)
+      end
+
+    end
+
     describe 'integers' do
       it 'serializes value from -16 to 127 into 1 byte' do
         expect(Bolt::PackStream.pack(1)).to match_hex('01')

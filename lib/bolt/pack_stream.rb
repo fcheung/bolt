@@ -8,6 +8,7 @@ module Bolt
         when String then encode_string(value)
         when Symbol then encode_string(value.to_s)
         when Array then encode_array(value)
+        when Hash then encode_hash(value)
         when nil then "\xC0"
         when true then "\xC3"
         when false then "\xC2"
@@ -46,7 +47,21 @@ module Bolt
       array.inject(leader) {|buffer, item| buffer << pack(item)}
     end
 
-    
+    def self.encode_hash(hash)
+      size = hash.size
+      leader = case size
+      when 0..15 then [0xA0 + size].pack('C')
+      when 16..255 then [0xD8, size].pack('CC')
+      when 256..65535 then [0xD9, size].pack('CS>')
+      when 65536...0x100000000 then [0xDA, size].pack('CL>')
+      else 
+        raise ArgumentError, "Hash is too big #{size}"
+      end
+      hash.inject(leader) do |buffer, (key, value)| 
+        buffer << pack(key)
+        buffer << pack(value)
+      end
+    end
 
     def self.encode_string(string)
       encoded = string.encode('utf-8')
