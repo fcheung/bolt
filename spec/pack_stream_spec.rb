@@ -217,5 +217,16 @@ describe Bolt::PackStream do
         expect {Bolt::PackStream.pack(a.new)}.to raise_error(ArgumentError)
       end
     end
+
+    describe 'multiple items' do
+      it 'concatenates their data' do
+        expect(Bolt::PackStream.pack(1, 'abc', [1.0])).to eq(
+          Bolt::PackStream.pack(1) +
+          Bolt::PackStream.pack('abc') +
+          Bolt::PackStream.pack([1.0])
+          )
+      end
+    end
   end
+
 end
