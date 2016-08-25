@@ -80,11 +80,11 @@ describe Bolt::PackStream do
         expect(Bolt::PackStream.pack((0..39).to_a)).to match_hex('D4:28:00:01:02:03:04:05:06:07:08:09:0A:0B:0C:0D:0E:0F:10:11:12:13:14:15:16:17:18:19:1A:1B:1C:1D:1E:1F:20:21:22:23:24:25:26:27')
       end
 
-      it 'serialises 256 to 65535 items as D5 followed big endian 2 unsigned byte length followed by text' do
+      it 'serialises 256 to 65535 items as D5 followed big endian 2 unsigned byte length followed by items' do
         expect(Bolt::PackStream.pack([1]*256)).to match_hex('D5:01:00' + ':01' * 256 )
       end
 
-      it 'serialises 65536 to  4294967295 bytes as D6 followed big endian 4 unsigned byte length followed by text' do
+      it 'serialises 65536 to  4294967295 items as D6 followed big endian 4 unsigned byte length followed by items' do
         expect(Bolt::PackStream.pack([1]*65536)).to match_hex('D6:00:01:00:00' + ':01' * 65536 )
       end
 
