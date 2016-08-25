@@ -32,6 +32,10 @@ describe Bolt::PackStream do
     end
 
     describe 'strings' do
+      it 'serializes symbols as strings' do
+        expect(Bolt::PackStream.pack(:foo)).to eq(Bolt::PackStream.pack('foo'))
+      end
+        
       it 'serializes <= 15 bytes to 80..8F followed by text' do
         expect(Bolt::PackStream.pack('é')).to match_hex('82:C3:A9')
         expect(Bolt::PackStream.pack('')).to match_hex('80')

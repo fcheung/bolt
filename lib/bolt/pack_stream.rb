@@ -6,6 +6,7 @@ module Bolt
         when Integer then encode_integer(value)
         when Float then ["\xC1", value].pack('AG')
         when String then encode_string(value)
+        when Symbol then encode_string(value.to_s)
         when Array then encode_array(value)
         when nil then "\xC0"
         when true then "\xC3"
