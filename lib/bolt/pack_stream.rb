@@ -4,6 +4,7 @@ module Bolt
       values.map do |value|
         case value
         when Integer then encode_integer(value)
+        when Float then ["\xC1", value].pack('AG')
         when nil then "\xC0"
         when true then "\xC3"
         when false then "\xC2"

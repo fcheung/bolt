@@ -25,6 +25,12 @@ describe Bolt::PackStream do
       end
     end
 
+    describe 'floats' do
+      it 'serializes values as C1 followed by 8 bytes of IEEE 754' do
+        expect(Bolt::PackStream.pack(6.283185307179586)).to match_hex('C1:40:19:21:FB:54:44:2D:18')
+      end
+    end
+    
     describe 'integers' do
       it 'serializes value from -16 to 127 into 1 byte' do
         expect(Bolt::PackStream.pack(1)).to match_hex('01')
