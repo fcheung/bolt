@@ -5,6 +5,7 @@ module Bolt
         case value
         when Integer then encode_integer(value)
         when Float then ["\xC1", value].pack('AG')
+        when String then encode_string(value)
         when nil then "\xC0"
         when true then "\xC3"
         when false then "\xC2"
@@ -30,5 +31,18 @@ module Bolt
       end
     end
 
+    def self.encode_string(string)
+      encoded = string.encode('utf-8')
+      bytesize = encoded.bytesize
+      leader = case bytesize
+      when 0..15 then [0x80 + bytesize].pack('C')
+      when 16..255 then [0xD0, bytesize].pack('CC')
+      when 256..65535 then [0xD1, bytesize].pack('CS>')
+      when 65536...0x100000000 then [0xD2, bytesize].pack('CL>')
+      else 
+        raise ArgumentError, "String is too long"
+      end
+      leader + encoded.force_encoding('BINARY')
+    end
   end
 end

@@ -30,7 +30,44 @@ describe Bolt::PackStream do
         expect(Bolt::PackStream.pack(6.283185307179586)).to match_hex('C1:40:19:21:FB:54:44:2D:18')
       end
     end
-    
+
+    describe 'strings' do
+      it 'serializes <= 15 bytes to 80..8F followed by text' do
+        expect(Bolt::PackStream.pack('é')).to match_hex('82:C3:A9')
+        expect(Bolt::PackStream.pack('')).to match_hex('80')
+        expect(Bolt::PackStream.pack('A')).to match_hex('81:41')
+      end
+      it 'serialises 16 to 255 bytes as D0 followed 1 unsigned byte length followed by text' do
+        expect(Bolt::PackStream.pack('ABCDEFGHIJKLMNOPQRSTUVWXYZ')).to match_hex('D0:1A:41:42:43:44:45:46:47:48:49:4A:4B:4C:4D:4E:4F:50:51:52:53:54:55:56:57:58:59:5A')
+      end
+
+      it 'serialises 256 to 65535 bytes as D1 followed big endian 2 unsigned byte length followed by text' do
+        expect(Bolt::PackStream.pack('A'*256)).to match_hex('D1:01:00' + ':41' * 256 )
+      end
+
+      it 'serialises 65536 to  4294967295 bytes as D2 followed big endian 4 unsigned byte length followed by text' do
+        expect(Bolt::PackStream.pack('A'*65536)).to match_hex('D2:00:01:00:00' + ':41' * 65536 )
+      end
+
+      it "raises error if length >= 2^32 " do
+        expect {Bolt::PackStream.pack(instance_double(String, bytesize: 2**32))}.to raise_error(ArgumentError)
+      end
+
+      it 'converts non utf 8 to utf 8' do
+        expect(Bolt::PackStream.pack("\xE9".force_encoding("ISO-8859-1"))).to match_hex("82:C3:A9")
+      end
+
+      it 'passes examples' do
+        aggregate_failures do 
+          expect(Bolt::PackStream.pack('ABCDEFGHIJKLMNOPQRSTUVWXYZ')).to match_hex('D0:1A:41:42:43:44:45:46:47:48:49:4A:4B:4C:4D:4E:4F:50:51:52:53:54:55:56:57:58:59:5A')
+          expect(Bolt::PackStream.pack('Größenmaßstäbe')).to match_hex('D0:12:47:72:C3:B6:C3:9F:65:6E:6D:61:C3:9F:73:74:C3:A4:62:65')
+        end
+      end
+    end
+
+
+
+
     describe 'integers' do
       it 'serializes value from -16 to 127 into 1 byte' do
         expect(Bolt::PackStream.pack(1)).to match_hex('01')
