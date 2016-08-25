@@ -8,7 +8,7 @@ module Bolt
         else
           raise ArgumentError, "value #{value} cannot be packstreamed"
         end
-      end.join
+      end.join.force_encoding('BINARY')
     end
 
     def self.encode_integer(value)

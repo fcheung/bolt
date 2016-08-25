@@ -3,6 +3,11 @@ require 'spec_helper'
 describe Bolt::PackStream do
 
   describe 'pack' do
+    describe 'encoding' do
+      it 'returns binary strings' do
+        expect(Bolt::PackStream.pack(nil).encoding.names).to include('BINARY')
+      end
+    end
 
     describe 'null' do
       it 'serializes nil as 0xC0' do
