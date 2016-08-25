@@ -27,7 +27,7 @@ module Bolt
       elsif  -0x8000_0000 <= value && value < 0x8000_0000
         ["\xCA", value].pack('Al>')
       elsif  -0x8000_0000_0000_0000 <= value && value < 0x8000_0000_0000_0000
-        ["\xCA", value].pack('Aq>')
+        ["\xCB", value].pack('Aq>')
       else
         raise ArgumentError, "integer #{value} is out of range"
       end

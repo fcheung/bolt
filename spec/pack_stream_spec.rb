@@ -123,8 +123,8 @@ describe Bolt::PackStream do
 
 
       it 'serializes value from -9_223_372_036_854_775_808 to 9_223_372_036_854_775_807 into CB plus 8 signed big endian bytes' do
-        expect(Bolt::PackStream.pack(-9_223_372_036_854_775_808)).to match_hex('CA:80:00:00:00:00:00:00:00')
-        expect(Bolt::PackStream.pack(9_223_372_036_854_775_807)).to match_hex('CA:7F:FF:FF:FF:FF:FF:FF:FF')
+        expect(Bolt::PackStream.pack(-9_223_372_036_854_775_808)).to match_hex('CB:80:00:00:00:00:00:00:00')
+        expect(Bolt::PackStream.pack(9_223_372_036_854_775_807)).to match_hex('CB:7F:FF:FF:FF:FF:FF:FF:FF')
       end
 
       it 'raises on out of range integer' do
