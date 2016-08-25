@@ -229,4 +229,34 @@ describe Bolt::PackStream do
     end
   end
 
+  describe 'unpack' do
+    it 'unpacks true' do
+      expect(Bolt::PackStream.unpack("\xC3").next).to eq(true)
+    end
+
+    it 'unpacks false' do
+      expect(Bolt::PackStream.unpack("\xC2").next).to eq(false)
+    end
+
+    it 'unpacks nil' do
+      expect(Bolt::PackStream.unpack("\xC0").next).to eq(nil)
+    end
+
+    it 'unpacks integers' do
+      expect(Bolt::PackStream.unpack("\x00\x7F\xC8\x80\xC9\x80\x00\xC9\x7F\xFF\xCA\x80\x00\x00\x00\xCB\x7F\xFF\xFF\xFF\xFF\xFF\xFF\xFF").to_a).to eq([
+        0, 127,
+        -128,
+        -32768,
+        32767,
+        -2_147_483_648,
+        9_223_372_036_854_775_807
+
+      ])
+    end
+
+    it 'allows integers formatted in an oversized container' do
+      expect(Bolt::PackStream.unpack("\xCB\x00\x00\x00\x00\x00\x00\x00\x20").next).to eq(32)
+    end
+  end
+
 end

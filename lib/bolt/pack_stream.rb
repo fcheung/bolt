@@ -31,6 +31,10 @@ module Bolt
         end.join.force_encoding('BINARY')
       end
 
+      def unpack(bytestring)
+        Unpacker.new(bytestring).enumerator
+      end
+
       private
 
       def encode_integer(value)
@@ -104,6 +108,72 @@ module Bolt
         end
         fields.inject(leader) {|buffer, item| buffer << pack(item)}
       end
+    end
+  end
+
+  class Unpacker
+    def initialize(data)
+      @data = data
+      @offset = 0
+    end
+
+    def enumerator
+      Enumerator.new do |y|
+        loop do
+          y << fetch_next_field
+          break if at_end?
+        end
+      end
+    end
+
+    def fetch_next_field
+      marker = next_byte
+      case marker
+      when 0xC0 then nil
+      when 0xC3 then true
+      when 0xC2 then false
+      when 0xC8 then get_signed_int8
+      when 0xC9 then get_signed_int16
+      when 0xCA then get_signed_int32
+      when 0xCB then get_signed_int64
+      else
+        return marker
+      end
+    end      
+    private
+
+    def get_signed_int8
+      int = @data.byteslice(@offset).unpack('c').first
+      @offset += 1
+      int
+    end
+
+    def get_signed_int16
+      int = @data.byteslice(@offset,2).unpack('s>').first
+      @offset += 2
+      int
+    end
+    
+    def get_signed_int32
+      int = @data.byteslice(@offset,4).unpack('l>').first
+      @offset += 4
+      int
+    end
+    
+    def get_signed_int64
+      int = @data.byteslice(@offset,8).unpack('q>').first
+      @offset += 8
+      int
+    end
+    
+    def next_byte
+      byte = @data.byteslice(@offset).unpack('C').first
+      @offset += 1
+      byte
+    end
+
+    def at_end?
+      @offset == @data.bytesize
     end
   end
 end
