@@ -3,6 +3,13 @@ require 'spec_helper'
 describe Bolt::PackStream do
 
   describe 'pack' do
+
+    describe 'null' do
+      it 'serializes nil as 0xC0' do
+        expect(Bolt::PackStream.pack(nil)).to match_hex('C0')
+      end
+    end
+
     describe 'integers' do
       it 'serializes value from -16 to 127 into 1 byte' do
         expect(Bolt::PackStream.pack(1)).to match_hex('01')

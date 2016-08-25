@@ -4,6 +4,7 @@ module Bolt
       values.map do |value|
         case value
         when Integer then encode_integer(value)
+        when nil then "\xC0"
         else
           raise ArgumentError, "value #{value} cannot be packstreamed"
         end
