@@ -6,6 +6,7 @@ module Bolt
         when Integer then encode_integer(value)
         when Float then ["\xC1", value].pack('AG')
         when String then encode_string(value)
+        when Array then encode_array(value)
         when nil then "\xC0"
         when true then "\xC3"
         when false then "\xC2"
@@ -31,6 +32,19 @@ module Bolt
       end
     end
 
+    def self.encode_array(array)
+      length = array.length
+      leader = case length
+      when 0..15 then [0x90 + length].pack('C')
+      when 16..255 then [0xD4, length].pack('CC')
+      when 256..65535 then [0xD5, length].pack('CS>')
+      when 65536...0x100000000 then [0xD6, length].pack('CL>')
+      else 
+        raise ArgumentError, "Array is too long #{length}"
+      end
+      leader + array.inject(''.force_encoding('BINARY')) {|buffer, item| buffer << pack(item)}
+    end
+
     def self.encode_string(string)
       encoded = string.encode('utf-8')
       bytesize = encoded.bytesize
@@ -40,7 +54,7 @@ module Bolt
       when 256..65535 then [0xD1, bytesize].pack('CS>')
       when 65536...0x100000000 then [0xD2, bytesize].pack('CL>')
       else 
-        raise ArgumentError, "String is too long"
+        raise ArgumentError, "String is too long (#{bytesize})"
       end
       leader + encoded.force_encoding('BINARY')
     end

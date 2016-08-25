@@ -65,8 +65,33 @@ describe Bolt::PackStream do
       end
     end
 
+    describe 'lists' do
+      it 'serializes <= 15 items to 90..9F followed by items' do
+        expect(Bolt::PackStream.pack([])).to match_hex('90')
+        expect(Bolt::PackStream.pack([1,2,3])).to match_hex('93:01:02:03')
+        expect(Bolt::PackStream.pack([1]*15)).to match_hex('9F'+ (':01'*15))
+      end
 
+      it 'serialises 16 to 255 items as D4 followed 1 unsigned byte length followed by items' do
+        expect(Bolt::PackStream.pack((0..39).to_a)).to match_hex('D4:28:00:01:02:03:04:05:06:07:08:09:0A:0B:0C:0D:0E:0F:10:11:12:13:14:15:16:17:18:19:1A:1B:1C:1D:1E:1F:20:21:22:23:24:25:26:27')
+      end
 
+      it 'serialises 256 to 65535 items as D5 followed big endian 2 unsigned byte length followed by text' do
+        expect(Bolt::PackStream.pack([1]*256)).to match_hex('D5:01:00' + ':01' * 256 )
+      end
+
+      it 'serialises 65536 to  4294967295 bytes as D6 followed big endian 4 unsigned byte length followed by text' do
+        expect(Bolt::PackStream.pack([1]*65536)).to match_hex('D6:00:01:00:00' + ':01' * 65536 )
+      end
+
+      it "raises error if length >= 2^32 " do
+        expect {Bolt::PackStream.pack(instance_double(Array, length: 2**32))}.to raise_error(ArgumentError)
+      end
+
+      it 'allows heterogenous lists' do
+        expect(Bolt::PackStream.pack([1, true, 3.14, "fünf"])).to match_hex('94:01:C3:C1:40:09:1E:B8:51:EB:85:1F:85:66:C3:BC:6E:66')
+      end
+    end
 
     describe 'integers' do
       it 'serializes value from -16 to 127 into 1 byte' do
