@@ -258,6 +258,36 @@ describe Bolt::PackStream do
       expect(Bolt::PackStream.unpack("\xCB\x00\x00\x00\x00\x00\x00\x00\x20").next).to eq(32)
     end
 
+    describe 'lists' do
+      it 'reads empty list' do
+        expect(Bolt::PackStream.unpack("\x90").next).to eq([])
+      end
+
+      it 'reads lists with combined marker and byte length' do
+        expect(Bolt::PackStream.unpack("\x91\x01").next).to eq [1]
+      end
+
+      it 'reads lists with 1 byte length' do
+        expect(Bolt::PackStream.unpack("\xD4\x03\x01\x85\x48\x65\x6c\x6c\x6f\x02").next).to eq [1, "Hello", 2]
+      end
+
+      it 'reads lists with 2 byte length' do
+       expect(Bolt::PackStream.unpack("\xD5\x00\x03\x01\x85\x48\x65\x6c\x6c\x6f\x02").next).to eq [1, "Hello", 2]
+      end   
+
+      it 'reads lists with 4 byte length' do
+       expect(Bolt::PackStream.unpack("\xD6\x00\x00\x00\x03\x01\x85\x48\x65\x6c\x6c\x6f\x02").next).to eq [1, "Hello", 2]
+      end   
+
+      it 'handles nested lists' do
+        expect(Bolt::PackStream.unpack("\x92\x91\x91\x91\x85\x48\x65\x6c\x6c\x6f\x01").next).to eq([[[['Hello']]],1])
+      end
+
+      it 'raises if length is longer than the buffer' do
+        expect { Bolt::PackStream.unpack("\x9F").next}.to raise_error(ArgumentError)
+      end
+    end
+
     describe 'strings' do
       it 'sets encoding of strings to utf8' do
         expect(Bolt::PackStream.unpack("\x85\x48\x65\x6c\x6c\x6f").next.encoding.name).to eq('UTF-8')
@@ -283,7 +313,7 @@ describe Bolt::PackStream do
       end
 
       it 'raises if length is longer than buffer' do
-        expect { Bolt::PackStream.unpack("\x8F").next}.to raise_error
+        expect { Bolt::PackStream.unpack("\x8F").next}.to raise_error(ArgumentError)
       end
     end
 

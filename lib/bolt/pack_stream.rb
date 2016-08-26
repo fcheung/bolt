@@ -140,6 +140,10 @@ module Bolt
       when 0xD0 then get_string(get_scalar(:uint8))
       when 0xD1 then get_string(get_scalar(:uint16))
       when 0xD2 then get_string(get_scalar(:uint32))
+      when 0x90..0x9F then get_list(marker & 0x0F)
+      when 0xD4 then get_list(get_scalar(:uint8))
+      when 0xD5 then get_list(get_scalar(:uint16))
+      when 0xD6 then get_list(get_scalar(:uint32))
       else
         return marker
       end
@@ -172,6 +176,10 @@ module Bolt
       raise ArgumentError, "end of string data missing, wanted #{length} bytes, found #{data.length}" if data.length < length
       @offset+= length
       data
+    end
+
+    def get_list(length)
+      length.times.collect { fetch_next_field }
     end
 
     def get_scalar(type)
