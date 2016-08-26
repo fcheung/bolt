@@ -169,6 +169,7 @@ module Bolt
 
     def get_string(length)
       data = @data.byteslice(@offset, length).force_encoding('UTF-8')
+      raise ArgumentError, "end of string data missing, wanted #{length} bytes, found #{data.length}" if data.length < length
       @offset+= length
       data
     end

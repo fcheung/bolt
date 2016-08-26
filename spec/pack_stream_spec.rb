@@ -266,6 +266,10 @@ describe Bolt::PackStream do
         expect(Bolt::PackStream.unpack("\x85\x48\x65\x6c\x6c\x6f\xC0").next).to eq('Hello')
       end
 
+      it 'reads empty string' do
+        expect(Bolt::PackStream.unpack("\x80\xC0").next).to eq('')
+      end
+
       it 'reads strings with 1 byte length' do
         expect(Bolt::PackStream.unpack("\xD0\x05\x48\x65\x6c\x6c\x6f\xC0").next).to eq('Hello')
       end
@@ -276,6 +280,10 @@ describe Bolt::PackStream do
 
       it 'reads strings with 4 byte length' do
         expect(Bolt::PackStream.unpack("\xD2\x00\x00\x00\x05\x48\x65\x6c\x6c\x6f\xC0").next).to eq('Hello')
+      end
+
+      it 'raises if length is longer than buffer' do
+        expect { Bolt::PackStream.unpack("\x8F").next}.to raise_error
       end
     end
 
