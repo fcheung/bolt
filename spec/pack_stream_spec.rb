@@ -295,6 +295,37 @@ describe Bolt::PackStream do
       end
     end
 
+    describe 'maps' do
+      it 'reads empty map' do
+        expect(Bolt::PackStream.unpack("\xA0").next).to eq({})
+      end
+
+      it 'reads maps with combined marker and byte length' do
+        expect(Bolt::PackStream.unpack("\xA1\x81\x31\x01").next).to eq({"1" => 1})
+      end
+
+
+      it 'reads maps with 1 byte length' do
+        expect(Bolt::PackStream.unpack("\xD8\x05\x81\x41\x01\x81\x42\x02\x81\x43\x03\x81\x44\x04\x81\x45\x05").next).to eq('A' => 1, 'B' => 2, 'C' => 3 , 'D' => 4, 'E' => 5)
+      end
+
+      it 'reads maps with 2 byte length' do
+        expect(Bolt::PackStream.unpack("\xD9\x00\x05\x81\x41\x01\x81\x42\x02\x81\x43\x03\x81\x44\x04\x81\x45\x05").next).to eq('A' => 1, 'B' => 2, 'C' => 3 , 'D' => 4, 'E' => 5)
+      end   
+
+      it 'reads maps with 4 byte length' do
+        expect(Bolt::PackStream.unpack("\xDA\x00\x00\x00\x05\x81\x41\x01\x81\x42\x02\x81\x43\x03\x81\x44\x04\x81\x45\x05").next).to eq('A' => 1, 'B' => 2, 'C' => 3 , 'D' => 4, 'E' => 5)
+      end   
+
+      it 'handles nested maps' do
+        expect(Bolt::PackStream.unpack("\xA2\x1\x92\x2\x3\x2\x3").next).to eq({1 => [2,3], 2 => 3})
+      end
+
+      it 'raises if length is longer than the buffer' do
+        expect { Bolt::PackStream.unpack("\xAF").next}.to raise_error(ArgumentError)
+      end
+    end
+
     describe 'strings' do
       it 'sets encoding of strings to utf8' do
         expect(Bolt::PackStream.unpack("\x85\x48\x65\x6c\x6c\x6f").next.encoding.name).to eq('UTF-8')

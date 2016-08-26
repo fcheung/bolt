@@ -145,6 +145,10 @@ module Bolt
       when 0xD4 then get_list(get_scalar(:uint8))
       when 0xD5 then get_list(get_scalar(:uint16))
       when 0xD6 then get_list(get_scalar(:uint32))
+      when 0xA0..0xAF then get_map(marker & 0x0F)
+      when 0xD8 then get_map(get_scalar(:uint8))
+      when 0xD9 then get_map(get_scalar(:uint16))
+      when 0xDA then get_map(get_scalar(:uint32))
       else
         return marker
       end
@@ -183,6 +187,10 @@ module Bolt
 
     def get_list(length)
       length.times.collect { fetch_next_field }
+    end
+
+    def get_map(length)
+      length.times.each_with_object({}) { |_, hash| hash[fetch_next_field]=fetch_next_field }
     end
 
     def get_scalar(type)
