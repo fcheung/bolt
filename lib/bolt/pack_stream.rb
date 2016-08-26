@@ -1,14 +1,16 @@
 module Bolt
   module PackStream
     
+    # Empty Module. 
+    # classes can include it to indicate that they implement the structure interface
+    # This requires the class to have a signature method, that returns the signature byte to use
+    # and a fields methods that returns an array of the fields the structure contains
+    #
     module Structure
-      def signature
-        raise UnimplementedError
-      end
+    end
 
-      def fields
-        raise UnimplementedError
-      end
+    class BasicStruct < Struct.new(:signature, :fields)
+      include Structure
     end
 
     class << self
