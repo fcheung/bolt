@@ -176,9 +176,11 @@ module Bolt
 
     def get_scalar(type)
       length = SIZES.fetch(type)
-      data = @data.byteslice(@offset, length).unpack(TYPES.fetch(type)).first
+      data = @data.byteslice(@offset, length)
+      raise ArgumentError, "end of scalar data missing, wanted #{length} bytes, found #{data.length}" if data.length < length
+      scalar = data.unpack(TYPES.fetch(type)).first
       @offset += length
-      data
+      scalar
     end
 
 
