@@ -1,4 +1,13 @@
 module Bolt
+
+  # A naive, pure ruby implementation of the packstream format. Other than structures, data is encoded/decoded to the obvious ruby primitives
+  # 
+  # For dumping, anything that includes the {Structure} module is consider a structure. It must respond to the signature and fields methods
+  #
+  #
+  # For loading, structures are loaded as instances of {Bolt::PackStream::BasicStruct}. You can customize the classes loaded by passing a non nil registry to {Bolt::PackStream.unpack}
+  #
+
   module PackStream
     
     # Empty Module. 
