@@ -127,50 +127,50 @@ module Bolt
     end
 
     def fetch_next_field
-      marker = next_byte
+      marker = get_scalar :uint8
       case marker
       when 0xC0 then nil
       when 0xC3 then true
       when 0xC2 then false
-      when 0xC8 then get_signed_int8
-      when 0xC9 then get_signed_int16
-      when 0xCA then get_signed_int32
-      when 0xCB then get_signed_int64
+      when 0xC8 then get_scalar :int8
+      when 0xC9 then get_scalar :int16
+      when 0xCA then get_scalar :int32
+      when 0xCB then get_scalar :int64
       else
         return marker
       end
     end      
     private
 
-    def get_signed_int8
-      int = @data.byteslice(@offset).unpack('c').first
-      @offset += 1
-      int
+    TYPES = {
+      :int8 => 'c',
+      :int16 => 's>',
+      :int32 => 'l>',
+      :int64 => 'q>',
+      :uint8 => 'C',
+      :uint16 => 'S>',
+      :uint32 => 'L>',
+      :uint64 => 'Q>',
+    }
+    SIZES = {
+      :int8 => 1,
+      :int16 => 2,
+      :int32 => 4,
+      :int64 => 8,
+      :uint8 => 1,
+      :uint16 => 2,
+      :uint32 => 4,
+      :uint64 => 8,
+    }
+
+
+    def get_scalar(type)
+      length = SIZES.fetch(type)
+      data = @data.byteslice(@offset, length).unpack(TYPES.fetch(type)).first
+      @offset += length
+      data
     end
 
-    def get_signed_int16
-      int = @data.byteslice(@offset,2).unpack('s>').first
-      @offset += 2
-      int
-    end
-    
-    def get_signed_int32
-      int = @data.byteslice(@offset,4).unpack('l>').first
-      @offset += 4
-      int
-    end
-    
-    def get_signed_int64
-      int = @data.byteslice(@offset,8).unpack('q>').first
-      @offset += 8
-      int
-    end
-    
-    def next_byte
-      byte = @data.byteslice(@offset).unpack('C').first
-      @offset += 1
-      byte
-    end
 
     def at_end?
       @offset == @data.bytesize
