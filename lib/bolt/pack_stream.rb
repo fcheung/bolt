@@ -33,8 +33,8 @@ module Bolt
         end.join.force_encoding('BINARY')
       end
 
-      def unpack(bytestring)
-        Unpacker.new(bytestring).enumerator
+      def unpack(bytestring, registry: nil)
+        Unpacker.new(bytestring, registry: registry).enumerator
       end
 
       private
@@ -114,9 +114,10 @@ module Bolt
   end
 
   class Unpacker
-    def initialize(data)
+    def initialize(data, registry: nil)
       @data = data
       @offset = 0
+      @registry = registry
     end
 
     def enumerator
@@ -151,6 +152,10 @@ module Bolt
       when 0xD8 then get_map(get_scalar(:uint8))
       when 0xD9 then get_map(get_scalar(:uint16))
       when 0xDA then get_map(get_scalar(:uint32))
+
+      when 0xB0..0xBF then get_struct(marker & 0x0F)
+      when 0xDC then get_struct(get_scalar(:uint8))
+      when 0xDD then get_struct(get_scalar(:uint16))
       else
         return marker
       end
@@ -193,6 +198,12 @@ module Bolt
 
     def get_map(length)
       length.times.each_with_object({}) { |_, hash| hash[fetch_next_field]=fetch_next_field }
+    end
+
+    def get_struct(length)
+      signature = get_scalar(:int8)
+      klass = (@registry && @registry[signature]) || Bolt::PackStream::BasicStruct 
+      klass.new(signature, get_list(length))
     end
 
     def get_scalar(type)

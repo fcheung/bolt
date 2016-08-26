@@ -355,6 +355,40 @@ describe Bolt::PackStream do
       end
     end
 
+    describe 'structs' do
+      it 'reads empty structs' do
+        expect(Bolt::PackStream.unpack("\xB0\x01").next).to eq(Bolt::PackStream::BasicStruct.new(1, []))
+      end
+
+      it 'reads structs with combined marker and length' do
+        expect(Bolt::PackStream.unpack("\xB2\x01\x85\x48\x65\x6c\x6c\x6f\xA0").next).to eq(Bolt::PackStream::BasicStruct.new(1, ["Hello", {}]))
+      end
+
+      it 'reads structs with 1 byte length' do
+        expect(Bolt::PackStream.unpack("\xDC\x10\x7F\x01\x02\x03\x04\x05\x06\x07\x08\x09\x00\x01\x02\x03\x04\x05\x06").next).to eq(
+          Bolt::PackStream::BasicStruct.new(0x7f,[1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6])
+        )
+
+      end
+
+      it 'reads structs with 2 byte length'do
+        expect(Bolt::PackStream.unpack("\xDD\x00\x10\x7F\x01\x02\x03\x04\x05\x06\x07\x08\x09\x00\x01\x02\x03\x04\x05\x06").next).to eq(
+          Bolt::PackStream::BasicStruct.new(0x7f,[1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6])
+        )
+      end
+
+      context 'with a registry of signatures to classes' do
+        it 'reads structs as the specified class' do
+          a = Class.new(Struct.new(:signature, :fields))
+          b = Class.new(Struct.new(:signature, :fields))
+
+          expect(Bolt::PackStream.unpack("\xB1\x01\x81\x41\xB1\x02\x81\x42", registry: {1 => a, 2 => b}).to_a).to eq([
+            a.new(1, ["A"]), b.new(2, ["B"])
+          ])
+
+        end
+      end
+    end
   end
 
 end
