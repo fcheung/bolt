@@ -132,6 +132,7 @@ module Bolt
       when 0xC0 then nil
       when 0xC3 then true
       when 0xC2 then false
+      when 0xC1 then get_scalar :float
       when 0xC8 then get_scalar :int8
       when 0xC9 then get_scalar :int16
       when 0xCA then get_scalar :int32
@@ -159,6 +160,7 @@ module Bolt
       :uint16 => 'S>',
       :uint32 => 'L>',
       :uint64 => 'Q>',
+      :float => 'G'
     }
     SIZES = {
       :int8 => 1,
@@ -169,6 +171,7 @@ module Bolt
       :uint16 => 2,
       :uint32 => 4,
       :uint64 => 8,
+      :float => 8
     }
 
     def get_string(length)
