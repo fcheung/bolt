@@ -11,6 +11,9 @@ module Bolt
 
     class BasicStruct < Struct.new(:signature, :fields)
       include Structure
+      def self.from_pack_stream(signature, fields)
+        new(signature, fields)
+      end
     end
 
     class << self
@@ -203,7 +206,7 @@ module Bolt
     def get_struct(length)
       signature = get_scalar(:int8)
       klass = (@registry && @registry[signature]) || Bolt::PackStream::BasicStruct 
-      klass.new(signature, get_list(length))
+      klass.from_pack_stream(signature, get_list(length))
     end
 
     def get_scalar(type)

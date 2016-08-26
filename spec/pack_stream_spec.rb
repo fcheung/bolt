@@ -379,8 +379,16 @@ describe Bolt::PackStream do
 
       context 'with a registry of signatures to classes' do
         it 'reads structs as the specified class' do
-          a = Class.new(Struct.new(:signature, :fields))
-          b = Class.new(Struct.new(:signature, :fields))
+          a = Class.new(Struct.new(:signature, :fields)) do
+            def self.from_pack_stream(signature, fields)
+              new(signature, fields)
+            end
+          end
+          b = Class.new(Struct.new(:signature, :fields)) do
+            def self.from_pack_stream(signature, fields)
+              new(signature, fields)
+            end
+          end
 
           expect(Bolt::PackStream.unpack("\xB1\x01\x81\x41\xB1\x02\x81\x42", registry: {1 => a, 2 => b}).to_a).to eq([
             a.new(1, ["A"]), b.new(2, ["B"])
