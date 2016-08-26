@@ -257,6 +257,28 @@ describe Bolt::PackStream do
     it 'allows integers formatted in an oversized container' do
       expect(Bolt::PackStream.unpack("\xCB\x00\x00\x00\x00\x00\x00\x00\x20").next).to eq(32)
     end
+
+    describe 'strings' do
+      it 'sets encoding of strings to utf8' do
+        expect(Bolt::PackStream.unpack("\x85\x48\x65\x6c\x6c\x6f").next.encoding.name).to eq('UTF-8')
+      end
+      it 'reads strings with combined marker and byte length' do
+        expect(Bolt::PackStream.unpack("\x85\x48\x65\x6c\x6c\x6f\xC0").next).to eq('Hello')
+      end
+
+      it 'reads strings with 1 byte length' do
+        expect(Bolt::PackStream.unpack("\xD0\x05\x48\x65\x6c\x6c\x6f\xC0").next).to eq('Hello')
+      end
+
+      it 'reads strings with 2 byte length' do
+        expect(Bolt::PackStream.unpack("\xD1\x00\x05\x48\x65\x6c\x6c\x6f\xC0").next).to eq('Hello')
+      end
+
+      it 'reads strings with 4 byte length' do
+        expect(Bolt::PackStream.unpack("\xD2\x00\x00\x00\x05\x48\x65\x6c\x6c\x6f\xC0").next).to eq('Hello')
+      end
+    end
+
   end
 
 end

@@ -136,6 +136,10 @@ module Bolt
       when 0xC9 then get_scalar :int16
       when 0xCA then get_scalar :int32
       when 0xCB then get_scalar :int64
+      when 0x80..0x8F then get_string(marker & 0x0F)
+      when 0xD0 then get_string(get_scalar(:uint8))
+      when 0xD1 then get_string(get_scalar(:uint16))
+      when 0xD2 then get_string(get_scalar(:uint32))
       else
         return marker
       end
@@ -163,6 +167,11 @@ module Bolt
       :uint64 => 8,
     }
 
+    def get_string(length)
+      data = @data.byteslice(@offset, length).force_encoding('UTF-8')
+      @offset+= length
+      data
+    end
 
     def get_scalar(type)
       length = SIZES.fetch(type)
