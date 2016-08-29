@@ -168,8 +168,9 @@ module Bolt
       when 0xB0..0xBF then get_struct(marker & 0x0F)
       when 0xDC then get_struct(get_scalar(:uint8))
       when 0xDD then get_struct(get_scalar(:uint16))
-      else
-        return marker
+      when 0...0x80 then marker
+      else #the small negative ones - convert to signed byte
+        marker - 0x100
       end
     end      
     private

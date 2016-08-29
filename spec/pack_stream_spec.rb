@@ -244,8 +244,9 @@ describe Bolt::PackStream do
       end
 
       it 'unpacks integers' do
-        expect(Bolt::PackStream.unpack("\x00\x7F\xC8\x80\xC9\x80\x00\xC9\x7F\xFF\xCA\x80\x00\x00\x00\xCB\x7F\xFF\xFF\xFF\xFF\xFF\xFF\xFF").to_a).to eq([
+        expect(Bolt::PackStream.unpack("\x00\x7F\xF0\xC8\x80\xC9\x80\x00\xC9\x7F\xFF\xCA\x80\x00\x00\x00\xCB\x7F\xFF\xFF\xFF\xFF\xFF\xFF\xFF").to_a).to eq([
           0, 127,
+          -16,
           -128,
           -32768,
           32767,
