@@ -230,6 +230,10 @@ describe Bolt::PackStream do
   end
 
   describe 'unpack' do
+    it 'rejects unknown marker bytes' do
+      expect {Bolt::PackStream.unpack("\xCC").next}.to raise_error(ArgumentError)
+    end
+
     describe 'scalars' do
       it 'unpacks true' do
         expect(Bolt::PackStream.unpack("\xC3").next).to eq(true)
