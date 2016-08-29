@@ -1,3 +1,4 @@
+# frozen_string_literal: true
 module Bolt
 
   # A naive, pure ruby implementation of the packstream format. Other than structures, data is encoded/decoded to the obvious ruby primitives
