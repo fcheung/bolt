@@ -218,7 +218,7 @@ describe Bolt::PackStream do
         a = Class.new do
           include Bolt::PackStream::Structure
           def fields
-            (1..65536)
+            (1..65536).to_a
           end
         end
         expect {Bolt::PackStream.pack(a.new)}.to raise_error(RangeError)

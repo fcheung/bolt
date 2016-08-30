@@ -202,7 +202,7 @@ void bolt_encode_structure(VALUE structure, VALUE buffer) {
 
   Check_Type(fields, T_ARRAY);
   long length = RARRAY_LEN(fields);
-  printf("(fields: %ld)\n", length);
+
   if(length >= 65536){
     rb_raise(rb_eRangeError, "Too many struct fields: %ld", length);
     return;
