@@ -1,14 +1,83 @@
 #include "bolt_native.h"
+#include <arpa/inet.h>
+
 VALUE rb_mBolt;
 VALUE rb_mBolt_packStream;
+ID id_pack_internal;
+
+#pragma pack(1)
+typedef union {
+  struct  {
+    uint8_t marker;
+    union {
+      uint8_t byte_length;
+      uint16_t two_byte_length;
+      uint32_t four_byte_length;
+    } lengths;
+  } structured;
+  uint8_t raw[5];
+} MarkerHeader;
+#pragma pack()
 
 void
 Init_bolt_native(void)
 {
   rb_mBolt = rb_const_get(rb_cObject, rb_intern("Bolt"));
   rb_mBolt_packStream = rb_const_get(rb_mBolt, rb_intern("PackStream"));
-
+  id_pack_internal = rb_intern("pack_internal");
   rb_define_singleton_method(rb_mBolt_packStream, "encode_integer", RUBY_METHOD_FUNC(rb_bolt_encode_integer),2);
+  rb_define_singleton_method(rb_mBolt_packStream, "encode_array", RUBY_METHOD_FUNC(rb_bolt_encode_array),2);
+}
+
+VALUE pack_internal(VALUE buffer, VALUE item){
+  if(IMMEDIATE_P(item)){
+    if(FIXNUM_P(item)){
+      rb_bolt_encode_integer(rb_mBolt_packStream, item, buffer);      
+    }else{
+      rb_funcall(rb_mBolt_packStream, id_pack_internal,2,buffer,item);
+    }
+  }else {
+    switch(RB_BUILTIN_TYPE(item)){
+      case T_BIGNUM:
+        rb_bolt_encode_integer(rb_mBolt_packStream, item, buffer);
+        break;
+      default:
+        rb_funcall(rb_mBolt_packStream, id_pack_internal,2,buffer,item);
+    }
+  }
+  return buffer;
+}
+
+
+VALUE rb_bolt_encode_array(VALUE self, VALUE array, VALUE buffer){
+  long length = RARRAY_LEN(array);
+  long offset = 0;
+  MarkerHeader header ={};
+
+  if(length <= 15){
+    header.structured.marker = 0x90 + length;
+    rb_str_buf_cat(buffer, (const char*)header.raw,1);
+  }else{
+    if(length <= 255){
+      header.structured.marker = 0xD4;
+      header.structured.lengths.byte_length = (uint8_t)length;
+      rb_str_buf_cat(buffer, (const char*)header.raw,2);
+    }else if(length <= 65535){
+      header.structured.marker = 0xD5;
+      header.structured.lengths.two_byte_length = htons((uint16_t)length);
+      rb_str_buf_cat(buffer, (const char*)header.raw,3);
+    }else if(length <= 0x100000000){
+      header.structured.marker = 0xD6;
+      header.structured.lengths.four_byte_length = htonl((uint32_t)length);
+      rb_str_buf_cat(buffer, (const char*)header.raw,5);
+    }else {
+      rb_raise(rb_eRangeError,"Array is too long (%ld items)", length);
+    }
+  }
+  for(; offset < length ;offset++){
+    pack_internal(buffer, RARRAY_AREF(array,offset));
+  }
+  return buffer;
 }
 
 VALUE rb_bolt_encode_integer(VALUE self, VALUE integer, VALUE buffer){
