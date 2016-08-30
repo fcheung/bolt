@@ -27,23 +27,14 @@ module Bolt
     end
 
     class << self
+      NULL = "\xC0".dup.force_encoding('BINARY')
+      TRUE = "\xC3".dup.force_encoding('BINARY')
+      FALSE = "\xC2".dup.force_encoding('BINARY')
+
       def pack(*values)
-        values.map do |value|
-          case value
-          when Integer then encode_integer(value)
-          when Float then ["\xC1", value].pack('AG')
-          when String then encode_string(value)
-          when Symbol then encode_string(value.to_s)
-          when Array then encode_array(value)
-          when Hash then encode_hash(value)
-          when Structure then encode_structure(value)
-          when nil then "\xC0"
-          when true then "\xC3"
-          when false then "\xC2"
-          else
-            raise ArgumentError, "value #{value} cannot be packstreamed"
-          end
-        end.join.force_encoding('BINARY')
+        values.inject("".dup.force_encoding('BINARY')) do |buffer, value|
+          pack_internal(buffer, value)
+        end
       end
 
       def unpack(bytestring, registry: nil)
@@ -52,8 +43,26 @@ module Bolt
 
       private
 
-      def encode_integer(value)
-        if -0x10 <= value && value < 0x80
+      def pack_internal(buffer, value)
+        case value
+        when Integer then encode_integer(value, buffer)
+        when Float then buffer << ["\xC1", value].pack('AG')
+        when String then encode_string(value, buffer)
+        when Symbol then encode_string(value.to_s, buffer)
+        when Array then encode_array(value, buffer)
+        when Hash then encode_hash(value, buffer)
+        when Structure then encode_structure(value, buffer)
+        when nil then buffer << NULL
+        when true then buffer << TRUE
+        when false then buffer << FALSE
+        else
+          raise ArgumentError, "value #{value} cannot be packstreamed"
+        end
+        buffer
+      end
+
+      def encode_integer(value, buffer)
+        data = if -0x10 <= value && value < 0x80
           [value].pack('c')
         elsif -0x80 <= value  && value < 0x80
           ["\xC8", value].pack('Ac')
@@ -66,9 +75,10 @@ module Bolt
         else
           raise ArgumentError, "integer #{value} is out of range"
         end
+        buffer << data
       end
 
-      def encode_array(array)
+      def encode_array(array, buffer)
         length = array.length
         leader = case length
         when 0..15 then [0x90 + length].pack('C')
@@ -78,10 +88,11 @@ module Bolt
         else 
           raise ArgumentError, "Array is too long #{length}"
         end
-        array.inject(leader) {|buffer, item| buffer << pack(item)}
+        buffer << leader
+        array.each { |item| pack_internal(buffer, item)}
       end
 
-      def encode_hash(hash)
+      def encode_hash(hash, buffer)
         size = hash.size
         leader = case size
         when 0..15 then [0xA0 + size].pack('C')
@@ -91,13 +102,14 @@ module Bolt
         else 
           raise ArgumentError, "Hash is too big #{size}"
         end
-        hash.inject(leader) do |buffer, (key, value)| 
-          buffer << pack(key)
-          buffer << pack(value)
+        buffer << leader
+        hash.each do |key, value| 
+          pack_internal(buffer, key)
+          pack_internal(buffer, value)
         end
       end
 
-      def encode_string(string)
+      def encode_string(string, buffer)
         encoded = string.encode('utf-8')
         bytesize = encoded.bytesize
         leader = case bytesize
@@ -108,10 +120,11 @@ module Bolt
         else 
           raise ArgumentError, "String is too long (#{bytesize})"
         end
-        leader + encoded.force_encoding('BINARY')
+        buffer << leader
+        buffer << encoded.force_encoding('BINARY')
       end
 
-      def encode_structure(struct)
+      def encode_structure(struct, buffer)
         fields = struct.fields
         size = fields.size
         leader = case size
@@ -121,7 +134,8 @@ module Bolt
         else
           raise ArgumentError, "structure has too many fields (#{size})"
         end
-        fields.inject(leader) {|buffer, item| buffer << pack(item)}
+        buffer << leader
+        fields.each {|item| pack_internal(buffer, item)}
       end
     end
   end
