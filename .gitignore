@@ -9,3 +9,6 @@
 /tmp/
 /spec/examples.txt
 /.byebug_history
+/lib/bolt/*.bundle
+/lib/bolt/*.so
+/ext/bolt_native/*.o

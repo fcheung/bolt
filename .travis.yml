@@ -2,4 +2,7 @@ sudo: false
 language: ruby
 rvm:
   - 2.3.1
+script:
+- bundle exec rake
+- bundle exec rake spec BOLT_DISABLE_NATIVE_EXTENSIONS=1
 before_install: gem install bundler -v 1.12.0
