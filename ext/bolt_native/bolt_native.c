@@ -1,6 +1,6 @@
 #include "bolt_native.h"
 #include <arpa/inet.h>
-
+#include "ruby/encoding.h"
 VALUE rb_mBolt;
 VALUE rb_mBolt_packStream;
 ID id_pack_internal;
@@ -27,6 +27,8 @@ Init_bolt_native(void)
   id_pack_internal = rb_intern("pack_internal");
   rb_define_singleton_method(rb_mBolt_packStream, "encode_integer", RUBY_METHOD_FUNC(rb_bolt_encode_integer),2);
   rb_define_singleton_method(rb_mBolt_packStream, "encode_array", RUBY_METHOD_FUNC(rb_bolt_encode_array),2);
+  rb_define_singleton_method(rb_mBolt_packStream, "encode_hash", RUBY_METHOD_FUNC(rb_bolt_encode_hash),2);
+  rb_define_singleton_method(rb_mBolt_packStream, "encode_string", RUBY_METHOD_FUNC(rb_bolt_encode_string),2);
 }
 
 VALUE pack_internal(VALUE buffer, VALUE item){
@@ -41,6 +43,15 @@ VALUE pack_internal(VALUE buffer, VALUE item){
       case T_BIGNUM:
         rb_bolt_encode_integer(rb_mBolt_packStream, item, buffer);
         break;
+      case T_HASH:
+        bolt_encode_hash(item, buffer);
+        break;      
+      case T_ARRAY:
+        bolt_encode_array(item, buffer);
+        break;
+      case T_STRING:
+        bolt_encode_string(item, buffer);
+        break;
       default:
         rb_funcall(rb_mBolt_packStream, id_pack_internal,2,buffer,item);
     }
@@ -49,36 +60,82 @@ VALUE pack_internal(VALUE buffer, VALUE item){
 }
 
 
-VALUE rb_bolt_encode_array(VALUE self, VALUE array, VALUE buffer){
-  long length = RARRAY_LEN(array);
-  long offset = 0;
+static inline void append_marker_and_length(uint8_t base_marker, uint8_t base_length_marker, long length, VALUE buffer  ){
   MarkerHeader header ={};
 
   if(length <= 15){
-    header.structured.marker = 0x90 + length;
+    header.structured.marker = base_marker + length;
     rb_str_buf_cat(buffer, (const char*)header.raw,1);
   }else{
     if(length <= 255){
-      header.structured.marker = 0xD4;
+      header.structured.marker = base_length_marker;
       header.structured.lengths.byte_length = (uint8_t)length;
       rb_str_buf_cat(buffer, (const char*)header.raw,2);
     }else if(length <= 65535){
-      header.structured.marker = 0xD5;
+      header.structured.marker = base_length_marker+1;
       header.structured.lengths.two_byte_length = htons((uint16_t)length);
       rb_str_buf_cat(buffer, (const char*)header.raw,3);
     }else if(length <= 0x100000000){
-      header.structured.marker = 0xD6;
+      header.structured.marker = base_length_marker+2;
       header.structured.lengths.four_byte_length = htonl((uint32_t)length);
       rb_str_buf_cat(buffer, (const char*)header.raw,5);
     }else {
-      rb_raise(rb_eRangeError,"Array is too long (%ld items)", length);
+      rb_raise(rb_eRangeError,"Data is too long (%ld items)", length);
     }
   }
-  for(; offset < length ;offset++){
-    pack_internal(buffer, RARRAY_AREF(array,offset));
-  }
+}
+
+
+static int encode_hash_iterator(VALUE key, VALUE val, VALUE buffer){
+  pack_internal(buffer, key);
+  pack_internal(buffer, val);
+  return ST_CONTINUE;
+}
+
+void bolt_encode_hash(VALUE hash, VALUE buffer){
+  long length = RHASH_SIZE(hash);
+  long offset = 0;
+  append_marker_and_length(0xA0,0xD8, length, buffer);
+  rb_hash_foreach(hash, encode_hash_iterator, buffer);
+}
+
+VALUE rb_bolt_encode_hash(VALUE self, VALUE hash, VALUE buffer){
+  Check_Type(hash,T_HASH);
+  bolt_encode_hash(hash, buffer);
   return buffer;
 }
+
+
+void bolt_encode_array(VALUE array, VALUE buffer) {
+  long length = RARRAY_LEN(array);
+  long offset = 0;
+  append_marker_and_length(0x90,0xD4, length, buffer);
+  for(; offset < length ;offset++){
+    pack_internal(buffer, RARRAY_AREF(array,offset));
+  }  
+}
+
+VALUE rb_bolt_encode_array(VALUE self, VALUE array, VALUE buffer){
+  Check_Type(array,T_ARRAY);
+  bolt_encode_array(array, buffer);
+  return buffer;
+}
+
+void bolt_encode_string(VALUE string, VALUE buffer) {
+  VALUE encoded = rb_str_encode(string, rb_enc_from_encoding(rb_utf8_encoding()),
+              0,Qnil);
+  long length = RSTRING_LEN(encoded);
+  append_marker_and_length(0x80,0xD0, length, buffer);
+  rb_str_buf_cat(buffer, RSTRING_PTR(encoded), RSTRING_LEN(encoded));
+}
+
+VALUE rb_bolt_encode_string(VALUE self, VALUE string, VALUE buffer){
+  Check_Type(string,T_STRING);
+  bolt_encode_string(string, buffer);
+  return buffer;
+}
+
+
 
 VALUE rb_bolt_encode_integer(VALUE self, VALUE integer, VALUE buffer){
   size_t length=0;
