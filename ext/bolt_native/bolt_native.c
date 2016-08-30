@@ -3,8 +3,10 @@
 #include "ruby/encoding.h"
 VALUE rb_mBolt;
 VALUE rb_mBolt_packStream;
+VALUE rb_mBolt_structure;
 ID id_pack_internal;
-
+ID id_fields;
+ID id_signature;
 #pragma pack(1)
 typedef union {
   struct  {
@@ -25,10 +27,15 @@ Init_bolt_native(void)
   rb_mBolt = rb_const_get(rb_cObject, rb_intern("Bolt"));
   rb_mBolt_packStream = rb_const_get(rb_mBolt, rb_intern("PackStream"));
   id_pack_internal = rb_intern("pack_internal");
+  id_signature = rb_intern("signature");
+  id_fields = rb_intern("fields");
+  rb_mBolt_structure = rb_const_get(rb_mBolt_packStream, rb_intern("Structure"));
+
   rb_define_singleton_method(rb_mBolt_packStream, "encode_integer", RUBY_METHOD_FUNC(rb_bolt_encode_integer),2);
   rb_define_singleton_method(rb_mBolt_packStream, "encode_array", RUBY_METHOD_FUNC(rb_bolt_encode_array),2);
   rb_define_singleton_method(rb_mBolt_packStream, "encode_hash", RUBY_METHOD_FUNC(rb_bolt_encode_hash),2);
   rb_define_singleton_method(rb_mBolt_packStream, "encode_string", RUBY_METHOD_FUNC(rb_bolt_encode_string),2);
+  rb_define_singleton_method(rb_mBolt_packStream, "encode_structure", RUBY_METHOD_FUNC(rb_bolt_encode_structure),2);
 }
 
 VALUE pack_internal(VALUE buffer, VALUE item){
@@ -38,6 +45,18 @@ VALUE pack_internal(VALUE buffer, VALUE item){
     }
     else if(FLONUM_P(item)){
       bolt_encode_float(item, buffer);      
+    }
+    else if(RB_SYMBOL_P(item)){
+      bolt_encode_string(rb_sym_to_s(item), buffer);
+    }
+    else if(item == Qnil){
+      rb_str_buf_cat(buffer, "\xC0", 1);
+    }
+    else if(item == Qtrue){
+      rb_str_buf_cat(buffer, "\xC3", 1);
+    }
+    else if(item == Qfalse){
+      rb_str_buf_cat(buffer, "\xC2", 1);
     }
     else{
       rb_funcall(rb_mBolt_packStream, id_pack_internal,2,buffer,item);
@@ -176,6 +195,31 @@ VALUE rb_bolt_encode_string(VALUE self, VALUE string, VALUE buffer){
   return buffer;
 }
 
+
+void bolt_encode_structure(VALUE structure, VALUE buffer) {
+  VALUE fields = rb_funcall(structure, id_fields, 0);
+
+
+  Check_Type(fields, T_ARRAY);
+  long length = RARRAY_LEN(fields);
+  printf("(fields: %ld)\n", length);
+  if(length >= 65536){
+    rb_raise(rb_eRangeError, "Too many struct fields: %ld", length);
+    return;
+  }
+  VALUE signature = rb_funcall(structure, id_signature, 0);
+  uint8_t signature_byte = (uint8_t)FIX2INT(signature);
+  append_marker_and_length(0xB0,0xDC, length, buffer);
+  rb_str_buf_cat(buffer,(const char*)&signature_byte,1);
+  for(long offset =0; offset < length ;offset++){
+    pack_internal(buffer, RARRAY_AREF(fields,offset));
+  }  
+}
+
+VALUE rb_bolt_encode_structure(VALUE self, VALUE structure, VALUE buffer){
+  bolt_encode_structure(structure, buffer);
+  return buffer;
+}
 
 
 VALUE rb_bolt_encode_integer(VALUE self, VALUE integer, VALUE buffer){
