@@ -35,13 +35,20 @@ VALUE pack_internal(VALUE buffer, VALUE item){
   if(IMMEDIATE_P(item)){
     if(FIXNUM_P(item)){
       rb_bolt_encode_integer(rb_mBolt_packStream, item, buffer);      
-    }else{
+    }
+    else if(FLONUM_P(item)){
+      bolt_encode_float(item, buffer);      
+    }
+    else{
       rb_funcall(rb_mBolt_packStream, id_pack_internal,2,buffer,item);
     }
   }else {
     switch(RB_BUILTIN_TYPE(item)){
       case T_BIGNUM:
         rb_bolt_encode_integer(rb_mBolt_packStream, item, buffer);
+        break;
+      case T_FLOAT:
+        bolt_encode_float(item, buffer);      
         break;
       case T_HASH:
         bolt_encode_hash(item, buffer);
@@ -91,6 +98,40 @@ static int encode_hash_iterator(VALUE key, VALUE val, VALUE buffer){
   pack_internal(buffer, val);
   return ST_CONTINUE;
 }
+
+#pragma pack(1)
+typedef union {
+  struct {
+    uint8_t marker;
+    double d;
+  } s;
+  uint8_t raw[9];
+} FloatHeader;
+
+#pragma pack()
+
+#define swap(a, b) ((a)^=(b),(b)^=(a),(a)^=(b))
+
+void bolt_encode_float(VALUE rbfloat, VALUE buffer){
+  FloatHeader f;
+  f.s.marker = 0xC1;
+  f.s.d = RFLOAT_VALUE(rbfloat);
+  swap(f.raw[1], f.raw[8]);
+  swap(f.raw[2], f.raw[7]);
+  swap(f.raw[3], f.raw[6]);
+  swap(f.raw[4], f.raw[5]);
+ 
+
+  rb_str_buf_cat(buffer, (const char*)f.raw, sizeof(FloatHeader));
+}
+
+VALUE rb_bolt_encode_float(VALUE self, VALUE rbfloat, VALUE buffer){
+  Check_Type(rbfloat,T_FLOAT);
+  bolt_encode_float(rbfloat, buffer);
+  return buffer;
+}
+
+
 
 void bolt_encode_hash(VALUE hash, VALUE buffer){
   long length = RHASH_SIZE(hash);
