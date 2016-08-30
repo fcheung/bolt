@@ -73,7 +73,7 @@ module Bolt
         elsif  -0x8000_0000_0000_0000 <= value && value < 0x8000_0000_0000_0000
           ["\xCB", value].pack('Aq>')
         else
-          raise ArgumentError, "integer #{value} is out of range"
+          raise RangeError, "integer #{value} is out of range"
         end
         buffer << data
       end
@@ -86,7 +86,7 @@ module Bolt
         when 256..65535 then [0xD5, length].pack('CS>')
         when 65536...0x100000000 then [0xD6, length].pack('CL>')
         else 
-          raise ArgumentError, "Array is too long #{length}"
+          raise RangeError, "Array is too long #{length}"
         end
         buffer << leader
         array.each { |item| pack_internal(buffer, item)}
@@ -100,7 +100,7 @@ module Bolt
         when 256..65535 then [0xD9, size].pack('CS>')
         when 65536...0x100000000 then [0xDA, size].pack('CL>')
         else 
-          raise ArgumentError, "Hash is too big #{size}"
+          raise RangeError, "Hash is too big #{size}"
         end
         buffer << leader
         hash.each do |key, value| 
@@ -118,7 +118,7 @@ module Bolt
         when 256..65535 then [0xD1, bytesize].pack('CS>')
         when 65536...0x100000000 then [0xD2, bytesize].pack('CL>')
         else 
-          raise ArgumentError, "String is too long (#{bytesize})"
+          raise RangeError, "String is too long (#{bytesize})"
         end
         buffer << leader
         buffer << encoded.force_encoding('BINARY')
@@ -132,7 +132,7 @@ module Bolt
         when 16..255 then [0xDC, size, struct.signature].pack('CCC')
         when 256..65535 then [0xDD, size, struct.signature].pack('CS>C')
         else
-          raise ArgumentError, "structure has too many fields (#{size})"
+          raise RangeError, "structure has too many fields (#{size})"
         end
         buffer << leader
         fields.each {|item| pack_internal(buffer, item)}

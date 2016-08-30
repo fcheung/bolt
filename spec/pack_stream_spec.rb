@@ -54,7 +54,10 @@ describe Bolt::PackStream do
       end
 
       it "raises error if length >= 2^32 " do
-        expect {Bolt::PackStream.pack(instance_double(String, bytesize: 2**32))}.to raise_error(ArgumentError)
+        input = 'dummy'
+        expect(input).to receive(:bytesize).and_return(2**32)
+        allow(input).to receive(:encode).and_return(input)
+        expect {Bolt::PackStream.pack(input)}.to raise_error(RangeError)
       end
 
       it 'converts non utf 8 to utf 8' do
@@ -89,7 +92,9 @@ describe Bolt::PackStream do
       end
 
       it "raises error if length >= 2^32 " do
-        expect {Bolt::PackStream.pack(instance_double(Array, length: 2**32))}.to raise_error(ArgumentError)
+        input = []
+        expect(input).to receive(:length).and_return(2**32)
+        expect {Bolt::PackStream.pack(input)}.to raise_error(RangeError)
       end
 
       it 'allows heterogenous lists' do
@@ -120,7 +125,9 @@ describe Bolt::PackStream do
       end
 
       it "raises error if size >= 2^32 " do
-        expect {Bolt::PackStream.pack(instance_double(Hash, size: 2**32))}.to raise_error(ArgumentError)
+        input = {}
+        expect(input).to receive(:size).and_return(2**32)
+        expect {Bolt::PackStream.pack(input)}.to raise_error(RangeError)
       end
 
     end
@@ -156,7 +163,7 @@ describe Bolt::PackStream do
       end
 
       it 'raises on out of range integer' do
-        expect {Bolt::PackStream.pack(2**65)}.to raise_error(ArgumentError)
+        expect {Bolt::PackStream.pack(2**65)}.to raise_error(RangeError)
       end
     end
 
@@ -214,7 +221,7 @@ describe Bolt::PackStream do
             (1..65536)
           end
         end
-        expect {Bolt::PackStream.pack(a.new)}.to raise_error(ArgumentError)
+        expect {Bolt::PackStream.pack(a.new)}.to raise_error(RangeError)
       end
     end
 
