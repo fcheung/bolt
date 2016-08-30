@@ -31,11 +31,12 @@ Init_bolt_native(void)
   id_fields = rb_intern("fields");
   rb_mBolt_structure = rb_const_get(rb_mBolt_packStream, rb_intern("Structure"));
 
-  rb_define_singleton_method(rb_mBolt_packStream, "encode_integer", RUBY_METHOD_FUNC(rb_bolt_encode_integer),2);
-  rb_define_singleton_method(rb_mBolt_packStream, "encode_array", RUBY_METHOD_FUNC(rb_bolt_encode_array),2);
-  rb_define_singleton_method(rb_mBolt_packStream, "encode_hash", RUBY_METHOD_FUNC(rb_bolt_encode_hash),2);
-  rb_define_singleton_method(rb_mBolt_packStream, "encode_string", RUBY_METHOD_FUNC(rb_bolt_encode_string),2);
-  rb_define_singleton_method(rb_mBolt_packStream, "encode_structure", RUBY_METHOD_FUNC(rb_bolt_encode_structure),2);
+  rb_define_singleton_method(rb_mBolt_packStream, "pack_internal", RUBY_METHOD_FUNC(rb_bolt_pack_internal),2);
+}
+
+VALUE rb_bolt_pack_internal(VALUE self, VALUE buffer, VALUE item){
+  Check_Type(buffer, T_STRING);
+  return pack_internal(buffer, item);
 }
 
 VALUE pack_internal(VALUE buffer, VALUE item){
@@ -151,25 +152,11 @@ void bolt_encode_float(VALUE rbfloat, VALUE buffer){
   rb_str_buf_cat(buffer, (const char*)f.raw, sizeof(FloatHeader));
 }
 
-VALUE rb_bolt_encode_float(VALUE self, VALUE rbfloat, VALUE buffer){
-  Check_Type(rbfloat,T_FLOAT);
-  bolt_encode_float(rbfloat, buffer);
-  return buffer;
-}
-
-
-
 void bolt_encode_hash(VALUE hash, VALUE buffer){
   long length = RHASH_SIZE(hash);
   long offset = 0;
   append_marker_and_length(0xA0,0xD8, length, buffer);
   rb_hash_foreach(hash, encode_hash_iterator, buffer);
-}
-
-VALUE rb_bolt_encode_hash(VALUE self, VALUE hash, VALUE buffer){
-  Check_Type(hash,T_HASH);
-  bolt_encode_hash(hash, buffer);
-  return buffer;
 }
 
 
@@ -182,24 +169,12 @@ void bolt_encode_array(VALUE array, VALUE buffer) {
   }  
 }
 
-VALUE rb_bolt_encode_array(VALUE self, VALUE array, VALUE buffer){
-  Check_Type(array,T_ARRAY);
-  bolt_encode_array(array, buffer);
-  return buffer;
-}
-
 void bolt_encode_string(VALUE string, VALUE buffer) {
   VALUE encoded = rb_str_encode(string, rb_enc_from_encoding(rb_utf8_encoding()),
               0,Qnil);
   long length = RSTRING_LEN(encoded);
   append_marker_and_length(0x80,0xD0, length, buffer);
   rb_str_buf_cat(buffer, RSTRING_PTR(encoded), RSTRING_LEN(encoded));
-}
-
-VALUE rb_bolt_encode_string(VALUE self, VALUE string, VALUE buffer){
-  Check_Type(string,T_STRING);
-  bolt_encode_string(string, buffer);
-  return buffer;
 }
 
 
@@ -221,11 +196,6 @@ void bolt_encode_structure(VALUE structure, VALUE buffer) {
   for(long offset =0; offset < length ;offset++){
     pack_internal(buffer, RARRAY_AREF(fields,offset));
   }  
-}
-
-VALUE rb_bolt_encode_structure(VALUE self, VALUE structure, VALUE buffer){
-  bolt_encode_structure(structure, buffer);
-  return buffer;
 }
 
 
