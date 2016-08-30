@@ -40,55 +40,44 @@ VALUE rb_bolt_pack_internal(VALUE self, VALUE buffer, VALUE item){
 }
 
 VALUE pack_internal(VALUE buffer, VALUE item){
-  if(item == Qnil){
-    rb_str_buf_cat(buffer, "\xC0", 1);
-  }
-  else if(item == Qtrue){
-    rb_str_buf_cat(buffer, "\xC3", 1);
-  }
-  else if(item == Qfalse){
-    rb_str_buf_cat(buffer, "\xC2", 1);
-  }
-  else if(IMMEDIATE_P(item)){
-    if(FIXNUM_P(item)){
-      rb_bolt_encode_integer(rb_mBolt_packStream, item, buffer);      
-    }
-    else if(FLONUM_P(item)){
-      bolt_encode_float(item, buffer);      
-    }
-    else if(RB_SYMBOL_P(item)){
+  switch(rb_type(item)){
+    case T_BIGNUM:
+    case T_FIXNUM:
+      rb_bolt_encode_integer(rb_mBolt_packStream, item, buffer);
+      break;
+    case T_NIL:
+      rb_str_buf_cat(buffer, "\xC0", 1);
+      break;
+    case T_TRUE:
+      rb_str_buf_cat(buffer, "\xC3", 1);
+      break;
+    case T_FALSE:
+      rb_str_buf_cat(buffer, "\xC2", 1);
+      break;
+    case T_SYMBOL:
       bolt_encode_string(rb_sym_to_s(item), buffer);
-    }
-    else {
-      VALUE inspectOutput = rb_inspect(item);
-      rb_raise(rb_eArgError, "value %s cannot be packstreamed", StringValueCStr(inspectOutput) );
-    }
-  }else {
-    switch(RB_BUILTIN_TYPE(item)){
-      case T_BIGNUM:
-        rb_bolt_encode_integer(rb_mBolt_packStream, item, buffer);
-        break;
-      case T_FLOAT:
-        bolt_encode_float(item, buffer);      
-        break;
-      case T_HASH:
-        bolt_encode_hash(item, buffer);
-        break;      
-      case T_ARRAY:
-        bolt_encode_array(item, buffer);
-        break;
-      case T_STRING:
-        bolt_encode_string(item, buffer);
-        break;
-      default:
-        if(RTEST(rb_obj_is_kind_of(item, rb_mBolt_structure))){
-          bolt_encode_structure(item, buffer);
-        }
-        else{
-          VALUE inspectOutput = rb_inspect(item);
-          rb_raise(rb_eArgError, "value %s cannot be packstreamed", StringValueCStr(inspectOutput) );
-        }
-    }
+      break;
+    case T_FLOAT:
+      bolt_encode_float(item, buffer);      
+      break;
+    case T_HASH:
+      bolt_encode_hash(item, buffer);
+      break;      
+    case T_ARRAY:
+      bolt_encode_array(item, buffer);
+      break;
+    case T_STRING:
+      bolt_encode_string(item, buffer);
+      break;
+    default:
+      if(RTEST(rb_obj_is_kind_of(item, rb_mBolt_structure))){
+        bolt_encode_structure(item, buffer);
+      }
+      else{
+        VALUE inspectOutput = rb_inspect(item);
+        rb_raise(rb_eArgError, "value %s cannot be packstreamed", StringValueCStr(inspectOutput) );
+      }
+    
   }
   return buffer;
 }
