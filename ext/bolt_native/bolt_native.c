@@ -39,7 +39,16 @@ Init_bolt_native(void)
 }
 
 VALUE pack_internal(VALUE buffer, VALUE item){
-  if(IMMEDIATE_P(item)){
+  if(item == Qnil){
+    rb_str_buf_cat(buffer, "\xC0", 1);
+  }
+  else if(item == Qtrue){
+    rb_str_buf_cat(buffer, "\xC3", 1);
+  }
+  else if(item == Qfalse){
+    rb_str_buf_cat(buffer, "\xC2", 1);
+  }
+  else if(IMMEDIATE_P(item)){
     if(FIXNUM_P(item)){
       rb_bolt_encode_integer(rb_mBolt_packStream, item, buffer);      
     }
@@ -49,17 +58,9 @@ VALUE pack_internal(VALUE buffer, VALUE item){
     else if(RB_SYMBOL_P(item)){
       bolt_encode_string(rb_sym_to_s(item), buffer);
     }
-    else if(item == Qnil){
-      rb_str_buf_cat(buffer, "\xC0", 1);
-    }
-    else if(item == Qtrue){
-      rb_str_buf_cat(buffer, "\xC3", 1);
-    }
-    else if(item == Qfalse){
-      rb_str_buf_cat(buffer, "\xC2", 1);
-    }
-    else{
-      rb_funcall(rb_mBolt_packStream, id_pack_internal,2,buffer,item);
+    else {
+      VALUE inspectOutput = rb_inspect(item);
+      rb_raise(rb_eArgError, "value %s cannot be packstreamed", StringValueCStr(inspectOutput) );
     }
   }else {
     switch(RB_BUILTIN_TYPE(item)){
@@ -79,7 +80,13 @@ VALUE pack_internal(VALUE buffer, VALUE item){
         bolt_encode_string(item, buffer);
         break;
       default:
-        rb_funcall(rb_mBolt_packStream, id_pack_internal,2,buffer,item);
+        if(RTEST(rb_obj_is_kind_of(item, rb_mBolt_structure))){
+          bolt_encode_structure(item, buffer);
+        }
+        else{
+          VALUE inspectOutput = rb_inspect(item);
+          rb_raise(rb_eArgError, "value %s cannot be packstreamed", StringValueCStr(inspectOutput) );
+        }
     }
   }
   return buffer;
