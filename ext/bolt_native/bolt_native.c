@@ -233,44 +233,66 @@ void bolt_encode_structure(VALUE structure, WriteBuffer *buffer) {
 }
 
 
+#pragma pack(1)
+typedef union {
+  uint8_t marker;
+  struct {
+    uint8_t marker;
+    uint8_t value;
+  } one_byte;
+  struct {
+    uint8_t marker;
+    uint16_t value;
+  } two_byte;
+  struct {
+    uint8_t marker;
+    uint32_t value;
+  } four_byte;
+  struct {
+    uint8_t marker;
+    uint64_t value;
+  } eight_byte;
+  uint8_t raw[9];
+} IntHeader;
+#pragma pack()
+
+
 void rb_bolt_encode_integer(VALUE self, VALUE integer, WriteBuffer *buffer){
   size_t length=0;
-  uint8_t cbuffer[9]; /*an int is at most 1 byte length, 8 bytes data*/
+  ensure_capacity(buffer,sizeof(IntHeader));
   long long value = NUM2LL(integer);
   unsigned long long unsigned_value = (unsigned long long) value;
+  IntHeader *header = (IntHeader*)buffer->position;
   if(value >= -0x10 && value < 0x80){
-    cbuffer[0] = (uint8_t)(unsigned_value & 0xFF);
+    header->marker = (uint8_t)(unsigned_value & 0xFF);
     length = 1;
   }else if( -0x80 <= value && value < 0x80){
-    cbuffer[0] = '\xC8';
-    cbuffer[1] = (uint8_t)(unsigned_value & 0xFF);
+    header->one_byte.marker = '\xC8';
+    header->one_byte.value = (uint8_t)(unsigned_value & 0xFF);
     length = 2;
   }
   else if (-0x8000 <= value && value < 0x8000){
-    cbuffer[0] = '\xC9';
-    cbuffer[1] = (uint8_t)((unsigned_value & 0xFF00) >> 8);
-    cbuffer[2] = (uint8_t)((unsigned_value & 0xFF));
+    header->two_byte.marker = '\xC9';
+    header->two_byte.value = htons((uint16_t)unsigned_value);
     length = 3;
   }
   else if (-0x80000000L <= value && value < 0x80000000L){
-    cbuffer[0] = '\xCA';
-    cbuffer[1] = (uint8_t)((unsigned_value >> 24)  & 0xFF);
-    cbuffer[2] = (uint8_t)((unsigned_value >> 16)  & 0xFF);
-    cbuffer[3] = (uint8_t)((unsigned_value >> 8)  & 0xFF);
-    cbuffer[4] = (uint8_t)((unsigned_value)  & 0xFF);
+    header->four_byte.marker = '\xCA';
+    header->four_byte.value = htonl((uint32_t)unsigned_value);
     length = 5;
   }else {
-    cbuffer[0] = '\xCB';
-    cbuffer[1] = (uint8_t)((unsigned_value >> 56)  & 0xFF);
-    cbuffer[2] = (uint8_t)((unsigned_value >> 48)  & 0xFF);
-    cbuffer[3] = (uint8_t)((unsigned_value >> 40)  & 0xFF);
-    cbuffer[4] = (uint8_t)((unsigned_value >> 32)  & 0xFF);
-    cbuffer[5] = (uint8_t)((unsigned_value >> 24)  & 0xFF);
-    cbuffer[6] = (uint8_t)((unsigned_value >> 16)  & 0xFF);
-    cbuffer[7] = (uint8_t)((unsigned_value >> 8)  & 0xFF);
-    cbuffer[8] = (uint8_t)((unsigned_value)  & 0xFF);
+    header->raw[0] = '\xCB';
+
+    header->raw[1] = (uint8_t)((unsigned_value >> 56)  & 0xFF);
+    header->raw[2] = (uint8_t)((unsigned_value >> 48)  & 0xFF);
+    header->raw[3] = (uint8_t)((unsigned_value >> 40)  & 0xFF);
+    header->raw[4] = (uint8_t)((unsigned_value >> 32)  & 0xFF);
+    header->raw[5] = (uint8_t)((unsigned_value >> 24)  & 0xFF);
+    header->raw[6] = (uint8_t)((unsigned_value >> 16)  & 0xFF);
+    header->raw[7] = (uint8_t)((unsigned_value >> 8)  & 0xFF);
+    header->raw[8] = (uint8_t)((unsigned_value)  & 0xFF);
     length = 9;
   }
-  write_bytes(buffer, cbuffer, length);
-
+  buffer->position += length;
+  buffer->consumed += length;
 }
