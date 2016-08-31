@@ -160,22 +160,22 @@ typedef union {
   } s;
   uint8_t raw[9];
 } FloatHeader;
-
 #pragma pack()
 
 #define swap(a, b) ((a)^=(b),(b)^=(a),(a)^=(b))
 
 void bolt_encode_float(VALUE rbfloat, WriteBuffer *buffer){
-  FloatHeader f;
-  f.s.marker = 0xC1;
-  f.s.d = RFLOAT_VALUE(rbfloat);
-  swap(f.raw[1], f.raw[8]);
-  swap(f.raw[2], f.raw[7]);
-  swap(f.raw[3], f.raw[6]);
-  swap(f.raw[4], f.raw[5]);
+  ensure_capacity(buffer,sizeof(FloatHeader));
+  FloatHeader *f = (FloatHeader*)buffer->position;
+  f->s.marker = 0xC1;
+  f->s.d = RFLOAT_VALUE(rbfloat);
+  swap(f->raw[1], f->raw[8]);
+  swap(f->raw[2], f->raw[7]);
+  swap(f->raw[3], f->raw[6]);
+  swap(f->raw[4], f->raw[5]);
  
-
-  write_bytes(buffer, f.raw, sizeof(FloatHeader));
+  buffer->position += sizeof(FloatHeader);
+  buffer->consumed += sizeof(FloatHeader);
 }
 
 static int encode_hash_iterator(VALUE key, VALUE val, VALUE _buffer){
