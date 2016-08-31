@@ -21,6 +21,42 @@ typedef union {
 } MarkerHeader;
 #pragma pack()
 
+
+void ensure_capacity(WriteBuffer *b, size_t bytes){
+  if(b->consumed + bytes > b->allocated){
+    size_t new_size = b->allocated * 2 + bytes;
+    uint8_t *new_buffer = realloc(b->buffer,new_size);
+    if(!new_buffer){
+      free(b->buffer);
+      rb_raise(rb_eNoMemError, "failed to resize buffer to %lu", bytes);
+    }
+    b->buffer = new_buffer;
+    b->position = b->buffer + b->consumed;
+    b->allocated = new_size;
+  }
+}
+
+void allocate(WriteBuffer *b, size_t size){
+  b->buffer = malloc(size);
+  if(!b->buffer){
+    rb_raise(rb_eNoMemError, "failed to resize buffer to %lu", size);    
+  }
+  b->allocated = size;
+  b->consumed = 0;
+  b->position = b->buffer;
+}
+
+void deallocate(WriteBuffer *b){
+  free(b->buffer);
+  memset(b, 0, sizeof(WriteBuffer));
+}
+
+inline void write_bytes(WriteBuffer *b, const uint8_t *bytes, size_t size){
+  ensure_capacity(b, size);
+  memcpy(b->position, bytes, size);
+  b->position += size;
+  b->consumed += size;
+}
 void
 Init_bolt_native(void)
 {
@@ -34,25 +70,29 @@ Init_bolt_native(void)
   rb_define_singleton_method(rb_mBolt_packStream, "pack_internal", RUBY_METHOD_FUNC(rb_bolt_pack_internal),2);
 }
 
-VALUE rb_bolt_pack_internal(VALUE self, VALUE buffer, VALUE item){
-  Check_Type(buffer, T_STRING);
-  return pack_internal(buffer, item);
+VALUE rb_bolt_pack_internal(VALUE self, VALUE rb_buffer, VALUE item){
+  WriteBuffer buffer;
+  allocate(&buffer, 16);
+  pack_internal(&buffer, item);
+  rb_str_buf_cat(rb_buffer, (const char*)buffer.buffer, buffer.consumed);
+  deallocate(&buffer);
+  return rb_buffer;
 }
 
-VALUE pack_internal(VALUE buffer, VALUE item){
+void pack_internal(WriteBuffer *buffer, VALUE item){
   switch(rb_type(item)){
     case T_BIGNUM:
     case T_FIXNUM:
       rb_bolt_encode_integer(rb_mBolt_packStream, item, buffer);
       break;
     case T_NIL:
-      rb_str_buf_cat(buffer, "\xC0", 1);
+      write_bytes(buffer, (uint8_t*)"\xC0", 1);
       break;
     case T_TRUE:
-      rb_str_buf_cat(buffer, "\xC3", 1);
+      write_bytes(buffer, (uint8_t*)"\xC3", 1);
       break;
     case T_FALSE:
-      rb_str_buf_cat(buffer, "\xC2", 1);
+      write_bytes(buffer, (uint8_t*)"\xC2", 1);
       break;
     case T_SYMBOL:
       bolt_encode_string(rb_sym_to_s(item), buffer);
@@ -79,41 +119,38 @@ VALUE pack_internal(VALUE buffer, VALUE item){
       }
     
   }
-  return buffer;
 }
 
 
-static inline void append_marker_and_length(uint8_t base_marker, uint8_t base_length_marker, long length, VALUE buffer  ){
-  MarkerHeader header ={};
-
+static inline void append_marker_and_length(uint8_t base_marker, uint8_t base_length_marker, long length, WriteBuffer *buffer  ){
+  size_t header_size = 0;
+  ensure_capacity(buffer, 5); //biggest possible header
+  MarkerHeader *header = (MarkerHeader*) buffer->position;
   if(length <= 15){
-    header.structured.marker = base_marker + length;
-    rb_str_buf_cat(buffer, (const char*)header.raw,1);
+    header->structured.marker = base_marker + length;
+    header_size = 1;
   }else{
     if(length <= 255){
-      header.structured.marker = base_length_marker;
-      header.structured.lengths.byte_length = (uint8_t)length;
-      rb_str_buf_cat(buffer, (const char*)header.raw,2);
+      header->structured.marker = base_length_marker;
+      header->structured.lengths.byte_length = (uint8_t)length;
+      header_size = 2;
     }else if(length <= 65535){
-      header.structured.marker = base_length_marker+1;
-      header.structured.lengths.two_byte_length = htons((uint16_t)length);
-      rb_str_buf_cat(buffer, (const char*)header.raw,3);
+      header->structured.marker = base_length_marker+1;
+      header->structured.lengths.two_byte_length = htons((uint16_t)length);
+      header_size = 3;
     }else if(length <= 0x100000000){
-      header.structured.marker = base_length_marker+2;
-      header.structured.lengths.four_byte_length = htonl((uint32_t)length);
-      rb_str_buf_cat(buffer, (const char*)header.raw,5);
+      header->structured.marker = base_length_marker+2;
+      header->structured.lengths.four_byte_length = htonl((uint32_t)length);
+      header_size = 5;
     }else {
       rb_raise(rb_eRangeError,"Data is too long (%ld items)", length);
     }
   }
+  buffer->position += header_size;
+  buffer->consumed += header_size;
 }
 
 
-static int encode_hash_iterator(VALUE key, VALUE val, VALUE buffer){
-  pack_internal(buffer, key);
-  pack_internal(buffer, val);
-  return ST_CONTINUE;
-}
 
 #pragma pack(1)
 typedef union {
@@ -128,7 +165,7 @@ typedef union {
 
 #define swap(a, b) ((a)^=(b),(b)^=(a),(a)^=(b))
 
-void bolt_encode_float(VALUE rbfloat, VALUE buffer){
+void bolt_encode_float(VALUE rbfloat, WriteBuffer *buffer){
   FloatHeader f;
   f.s.marker = 0xC1;
   f.s.d = RFLOAT_VALUE(rbfloat);
@@ -138,18 +175,26 @@ void bolt_encode_float(VALUE rbfloat, VALUE buffer){
   swap(f.raw[4], f.raw[5]);
  
 
-  rb_str_buf_cat(buffer, (const char*)f.raw, sizeof(FloatHeader));
+  write_bytes(buffer, f.raw, sizeof(FloatHeader));
 }
 
-void bolt_encode_hash(VALUE hash, VALUE buffer){
+static int encode_hash_iterator(VALUE key, VALUE val, VALUE _buffer){
+  WriteBuffer *buffer = (WriteBuffer*)_buffer;
+  pack_internal(buffer, key);
+  pack_internal(buffer, val);
+  return ST_CONTINUE;
+}
+
+
+void bolt_encode_hash(VALUE hash, WriteBuffer *buffer){
   long length = RHASH_SIZE(hash);
   long offset = 0;
   append_marker_and_length(0xA0,0xD8, length, buffer);
-  rb_hash_foreach(hash, encode_hash_iterator, buffer);
+  rb_hash_foreach(hash, encode_hash_iterator, (VALUE)buffer);
 }
 
 
-void bolt_encode_array(VALUE array, VALUE buffer) {
+void bolt_encode_array(VALUE array, WriteBuffer *buffer) {
   long length = RARRAY_LEN(array);
   long offset = 0;
   append_marker_and_length(0x90,0xD4, length, buffer);
@@ -158,16 +203,16 @@ void bolt_encode_array(VALUE array, VALUE buffer) {
   }  
 }
 
-void bolt_encode_string(VALUE string, VALUE buffer) {
+void bolt_encode_string(VALUE string, WriteBuffer *buffer) {
   VALUE encoded = rb_str_encode(string, rb_enc_from_encoding(rb_utf8_encoding()),
               0,Qnil);
   long length = RSTRING_LEN(encoded);
   append_marker_and_length(0x80,0xD0, length, buffer);
-  rb_str_buf_cat(buffer, RSTRING_PTR(encoded), RSTRING_LEN(encoded));
+  write_bytes(buffer, (uint8_t*)RSTRING_PTR(encoded), RSTRING_LEN(encoded));
 }
 
 
-void bolt_encode_structure(VALUE structure, VALUE buffer) {
+void bolt_encode_structure(VALUE structure, WriteBuffer *buffer) {
   VALUE fields = rb_funcall(structure, id_fields, 0);
 
 
@@ -181,14 +226,14 @@ void bolt_encode_structure(VALUE structure, VALUE buffer) {
   VALUE signature = rb_funcall(structure, id_signature, 0);
   uint8_t signature_byte = (uint8_t)FIX2INT(signature);
   append_marker_and_length(0xB0,0xDC, length, buffer);
-  rb_str_buf_cat(buffer,(const char*)&signature_byte,1);
+  write_bytes(buffer,&signature_byte,1);
   for(long offset =0; offset < length ;offset++){
     pack_internal(buffer, RARRAY_AREF(fields,offset));
   }  
 }
 
 
-VALUE rb_bolt_encode_integer(VALUE self, VALUE integer, VALUE buffer){
+void rb_bolt_encode_integer(VALUE self, VALUE integer, WriteBuffer *buffer){
   size_t length=0;
   uint8_t cbuffer[9]; /*an int is at most 1 byte length, 8 bytes data*/
   long long value = NUM2LL(integer);
@@ -226,6 +271,6 @@ VALUE rb_bolt_encode_integer(VALUE self, VALUE integer, VALUE buffer){
     cbuffer[8] = (uint8_t)((unsigned_value)  & 0xFF);
     length = 9;
   }
-  return rb_str_buf_cat(buffer, (const char*)cbuffer, length);
+  write_bytes(buffer, cbuffer, length);
 
 }
