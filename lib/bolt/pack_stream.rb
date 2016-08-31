@@ -140,10 +140,52 @@ module Bolt
     end
   end
 
-  class Unpacker
-    def initialize(data, registry: nil)
-      @data = data
+  class ByteBuffer
+    def initialize(string)
+      @data = string.freeze
       @offset = 0
+    end
+
+    def read_string(length)
+      data = @data.byteslice(@offset, length).force_encoding('UTF-8')
+      raise ArgumentError, "end of string data missing, wanted #{length} bytes, found #{data.length}" if data.length < length
+      @offset+= length
+      data
+    end
+
+    def read_uint8;  get_scalar(1, 'C'); end
+    def read_uint16; get_scalar(2, 'S>'); end
+    def read_uint32; get_scalar(4, 'L>'); end
+    def read_uint64; get_scalar(8, 'Q>'); end
+
+    def read_int8;  get_scalar(1, 'c'); end
+    def read_int16; get_scalar(2, 's>'); end
+    def read_int32; get_scalar(4, 'l>'); end
+    def read_int64; get_scalar(8, 'q>'); end
+
+    def read_float; get_scalar(8, 'G'); end
+
+
+    def at_end?
+      @offset == @data.bytesize
+    end
+
+    private
+    def get_scalar(length, pattern)
+      data = @data.byteslice(@offset, length)
+      raise ArgumentError, "end of scalar data missing, wanted #{length} bytes, found #{data.length}" if data.length < length
+      scalar = data.unpack(pattern).first
+      @offset += length
+      scalar
+    end
+
+  end
+
+  class Unpacker
+
+
+    def initialize(data, registry: nil)
+      @data = ByteBuffer.new(data)
       @registry = registry
     end
 
@@ -151,78 +193,49 @@ module Bolt
       Enumerator.new do |y|
         loop do
           y << fetch_next_field
-          break if at_end?
+          break if @data.at_end?
         end
       end
     end
 
     def fetch_next_field
-      marker = get_scalar :uint8
+      marker = @data.read_uint8
+
       if marker < 0x80 then marker
       elsif marker >= 0xF0 then marker - 0x100 #the small negative ones - convert to signed byte
       elsif marker == 0xC0 then nil
-      elsif marker == 0xC1 then get_scalar :float
+      elsif marker == 0xC1 then @data.read_float
       elsif marker == 0xC2 then false
       elsif marker == 0xC3 then true
       #ints
-      elsif marker == 0xC8 then get_scalar :int8
-      elsif marker == 0xC9 then get_scalar :int16
-      elsif marker == 0xCA then get_scalar :int32
-      elsif marker == 0xCB then get_scalar :int64
+      elsif marker == 0xC8 then @data.read_int8
+      elsif marker == 0xC9 then @data.read_int16
+      elsif marker == 0xCA then @data.read_int32
+      elsif marker == 0xCB then @data.read_int64
       #strings
-      elsif marker >= 0x80 && marker <= 0x8F then get_string(marker & 0x0F)
-      elsif marker == 0xD0 then get_string(get_scalar(:uint8))
-      elsif marker == 0xD1 then get_string(get_scalar(:uint16))
-      elsif marker == 0xD2 then get_string(get_scalar(:uint32))
+      elsif marker >= 0x80 && marker <= 0x8F then @data.read_string(marker & 0x0F)
+      elsif marker == 0xD0 then @data.read_string(@data.read_uint8)
+      elsif marker == 0xD1 then @data.read_string(@data.read_uint16)
+      elsif marker == 0xD2 then @data.read_string(@data.read_uint32)
       #lists
       elsif marker >= 0x90 && marker <= 0x9F then get_list(marker & 0x0F)
-      elsif marker == 0xD4 then get_list(get_scalar(:uint8))
-      elsif marker == 0xD5 then get_list(get_scalar(:uint16))
-      elsif marker == 0xD6 then get_list(get_scalar(:uint32))
+      elsif marker == 0xD4 then get_list(@data.read_uint8)
+      elsif marker == 0xD5 then get_list(@data.read_uint16)
+      elsif marker == 0xD6 then get_list(@data.read_uint32)
       #maps
       elsif marker >= 0xA0 && marker <= 0xAF then get_map(marker & 0x0F)
-      elsif marker == 0xD8 then get_map(get_scalar(:uint8))
-      elsif marker == 0xD9 then get_map(get_scalar(:uint16))
-      elsif marker == 0xDA then get_map(get_scalar(:uint32))
+      elsif marker == 0xD8 then get_map(@data.read_uint8)
+      elsif marker == 0xD9 then get_map(@data.read_uint16)
+      elsif marker == 0xDA then get_map(@data.read_uint32)
       #structs
       elsif marker >= 0xB0 && marker <= 0xBF then get_struct(marker & 0x0F)
-      elsif marker == 0xDC then get_struct(get_scalar(:uint8))
-      elsif marker == 0xDD then get_struct(get_scalar(:uint16))
+      elsif marker == 0xDC then get_struct(@data.read_uint8)
+      elsif marker == 0xDD then get_struct(@data.read_uint16)
       else
         raise ArgumentError, "Unknown marker #{marker.to_s(16)}"
       end
     end      
     private
-
-    TYPES = {
-      :int8 => 'c',
-      :int16 => 's>',
-      :int32 => 'l>',
-      :int64 => 'q>',
-      :uint8 => 'C',
-      :uint16 => 'S>',
-      :uint32 => 'L>',
-      :uint64 => 'Q>',
-      :float => 'G'
-    }
-    SIZES = {
-      :int8 => 1,
-      :int16 => 2,
-      :int32 => 4,
-      :int64 => 8,
-      :uint8 => 1,
-      :uint16 => 2,
-      :uint32 => 4,
-      :uint64 => 8,
-      :float => 8
-    }
-
-    def get_string(length)
-      data = @data.byteslice(@offset, length).force_encoding('UTF-8')
-      raise ArgumentError, "end of string data missing, wanted #{length} bytes, found #{data.length}" if data.length < length
-      @offset+= length
-      data
-    end
 
     def get_list(length)
       length.times.collect { fetch_next_field }
@@ -233,23 +246,13 @@ module Bolt
     end
 
     def get_struct(length)
-      signature = get_scalar(:int8)
+      signature = @data.read_int8
       klass = (@registry && @registry[signature]) || Bolt::PackStream::BasicStruct 
       klass.from_pack_stream(signature, get_list(length))
     end
 
-    def get_scalar(type)
-      length = SIZES.fetch(type)
-      data = @data.byteslice(@offset, length)
-      raise ArgumentError, "end of scalar data missing, wanted #{length} bytes, found #{data.length}" if data.length < length
-      scalar = data.unpack(TYPES.fetch(type)).first
-      @offset += length
-      scalar
-    end
+  
 
 
-    def at_end?
-      @offset == @data.bytesize
-    end
   end
 end
