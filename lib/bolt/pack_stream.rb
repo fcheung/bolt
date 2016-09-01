@@ -5,14 +5,16 @@ module Bolt
   # 
   # For dumping, anything that includes the {Structure} module is consider a structure. It must respond to the signature and fields methods
   #
-  #
   # For loading, structures are loaded as instances of {Bolt::PackStream::BasicStruct}. You can customize the classes loaded by passing a non nil registry to {Bolt::PackStream.unpack}
+  #
+  # Most of the functionality in this module is overwritten by the native implementation where available
   #
 
   module PackStream
     
     # Empty Module. 
-    # classes can include it to indicate that they implement the structure interface
+    # 
+    # Classes can include it to indicate that they implement the structure interface
     # This requires the class to have a signature method, that returns the signature byte to use
     # and a fields methods that returns an array of the fields the structure contains
     #
@@ -31,14 +33,36 @@ module Bolt
       TRUE = "\xC3".dup.force_encoding('BINARY')
       FALSE = "\xC2".dup.force_encoding('BINARY')
 
+      # Serializes the arguments according to the PackStream format. If multiple arguments are passed the result
+      # is the concatentation of the serialization of the individual values.
+      #
+      # To be serializable a value must be an Integer, Float, String, Symbol (serialized as string), Array, Hash
+      # or include the {Structure} module
+      #
+      # @raise [ArgumentError] if the argument contains non serializable data
+      # @raise [RangeError] if the argument contains out of range data (such as integers >= 2**64)
+      # @return [String] - A packstream encoded string
       def pack(*values)
         values.inject("".dup.force_encoding('BINARY')) do |buffer, value|
           pack_internal(buffer, value)
         end
       end
 
+      # Unpacks the bytestring, returning an enumerator.
+      #
+      # The optional registry method allows control over what class structures are deserialized as. By default
+      # the {BasicStruct} class is used. The argument should be a hash where the keys are the signature byte values (as integers)
+      # and the values are classes. The class should have a singleton +from_pack_stream(signature, fields) method.
+      #
+      # This interface is convenient but someone slower than using {Unpacker#next_value}
+      #
+      # @param bytestring [String] The data to decode
+      # @param registry [Hash] A hash of integers to classes. 
+      # @raise [ArgumentError] if the data is not valid PackStream data
+      # @return An enumerator
+      #
       def unpack(bytestring, registry: nil)
-        Unpacker.new(bytestring, registry: registry).enumerator
+        ByteBuffer.new(bytestring, registry).enumerator
       end
 
       private
@@ -142,10 +166,27 @@ module Bolt
 
   class ByteBuffer
     attr_accessor :registry
-    def initialize(string)
+
+    def initialize(string, registry)
       @data = string.freeze
       @offset = 0
+      self.registry = registry
     end
+
+    def next_value
+      fetch_next_field
+    end
+
+    def enumerator
+      Enumerator.new do |y|
+        loop do
+          y << fetch_next_field
+          break if at_end?
+        end
+      end
+    end
+
+    private
 
     def read_string(length)
       data = @data.byteslice(@offset, length).force_encoding('UTF-8')
@@ -209,7 +250,6 @@ module Bolt
       end
     end     
 
-    private
     def get_scalar(length, pattern)
       data = @data.byteslice(@offset, length)
       raise ArgumentError, "end of scalar data missing, wanted #{length} bytes, found #{data.length}" if data.length < length
@@ -218,8 +258,6 @@ module Bolt
       scalar
     end
  
-    private
-
     def get_list(length)
       length.times.collect { fetch_next_field }
     end
@@ -236,27 +274,4 @@ module Bolt
 
   end
 
-  class Unpacker
-
-
-    def initialize(data, registry: nil)
-      @data = ByteBuffer.new(data)
-      @data.registry = registry
-    end
-
-    def next_value
-      @data.fetch_next_field
-    end
-
-    def enumerator
-      Enumerator.new do |y|
-        loop do
-          y << @data.fetch_next_field
-          break if @data.at_end?
-        end
-      end
-    end
-
-
-  end
 end

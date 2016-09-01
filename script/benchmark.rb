@@ -19,19 +19,19 @@ IMMEDIATES = [true, false, nil] * 65536
 Benchmark.ips do |x|
 
   x.report("unpack list of integers") do
-    Bolt::Unpacker.new(LIST_OF_INTEGERS).next_value
+    Bolt::ByteBuffer.new(LIST_OF_INTEGERS).next_value
   end
 
   x.report("unpack long list of integers") do
-    Bolt::Unpacker.new(LONG_LIST_OF_INTEGERS_DATA).next_value
+    Bolt::ByteBuffer.new(LONG_LIST_OF_INTEGERS_DATA).next_value
   end
 
   x.report("unpack map of strings") do
-    Bolt::Unpacker.new(MAP_OF_STRINGS).next_value
+    Bolt::ByteBuffer.new(MAP_OF_STRINGS).next_value
   end
 
   x.report("unpack big map of strings") do
-    Bolt::Unpacker.new(BIG_MAP_OF_INTS_TO_STRINGS_DATA).next_value
+    Bolt::ByteBuffer.new(BIG_MAP_OF_INTS_TO_STRINGS_DATA).next_value
   end
 
   x.report("pack big map of ints to strings") do

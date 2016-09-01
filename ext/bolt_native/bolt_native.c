@@ -83,7 +83,7 @@ Init_bolt_native(void)
   rb_mBolt_ByteBuffer = rb_const_get(rb_mBolt, rb_intern("ByteBuffer"));
 
   rb_define_alloc_func(rb_mBolt_ByteBuffer, rb_byte_buffer_allocate);
-  rb_define_method(rb_mBolt_ByteBuffer, "initialize", RUBY_METHOD_FUNC(rb_byte_buffer_initialize),1);
+  rb_define_method(rb_mBolt_ByteBuffer, "initialize", RUBY_METHOD_FUNC(rb_byte_buffer_initialize),-1);
 
   rb_define_method(rb_mBolt_ByteBuffer, "read_uint8", RUBY_METHOD_FUNC(rb_bolt_read_uint8),0);
   rb_define_method(rb_mBolt_ByteBuffer, "read_uint16", RUBY_METHOD_FUNC(rb_bolt_read_uint16),0);
@@ -507,22 +507,20 @@ VALUE rb_bolt_at_end_p(VALUE self){
 }
 
 
-VALUE rb_byte_buffer_initialize(VALUE self, VALUE string){
+VALUE rb_byte_buffer_initialize(int argc, VALUE * argv, VALUE self){
   ByteBuffer *buffer;
-  Check_Type(string, T_STRING);
   Data_Get_Struct(self, ByteBuffer, buffer);
-
-  RB_OBJ_FREEZE(string);
-  buffer->rb_buffer = string;
-  buffer->position = (uint8_t*) RSTRING_PTR(string);
-  buffer->end = (uint8_t*)RSTRING_PTR(string) + RSTRING_LEN(string);
+  rb_scan_args(argc, argv, "11", &buffer->rb_buffer, &buffer->rb_registry);
+  Check_Type(buffer->rb_buffer, T_STRING);
+  RB_OBJ_FREEZE(buffer->rb_buffer);
+  buffer->position = (uint8_t*) RSTRING_PTR(buffer->rb_buffer);
+  buffer->end = (uint8_t*)RSTRING_PTR(buffer->rb_buffer) + RSTRING_LEN(buffer->rb_buffer);
   return self;
 }
 
 VALUE rb_bolt_fetch_next_field(VALUE self){
   ByteBuffer *buffer;
   Data_Get_Struct(self, ByteBuffer, buffer);
-  buffer->rb_registry = rb_ivar_get(self, rb_intern("@registry"));
   return bolt_fetch_next_field(buffer);
 }
 

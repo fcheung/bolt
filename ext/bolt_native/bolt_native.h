@@ -60,7 +60,7 @@ VALUE rb_bolt_at_end_p(VALUE self);
 void bolt_check_buffer(ByteBuffer *, size_t);
 
 
-VALUE rb_byte_buffer_initialize(VALUE self, VALUE string);
+VALUE rb_byte_buffer_initialize(int argc, VALUE * argv, VALUE self);
 void rb_byte_buffer_mark(void *);
 VALUE rb_byte_buffer_allocate(VALUE);
 
