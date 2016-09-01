@@ -35,23 +35,23 @@ Benchmark.ips do |x|
   end
 
   x.report("pack big map of ints to strings") do
-    Bolt::PackStream.pack_internal("".dup.force_encoding('BINARY'),BIG_MAP_OF_INTS_TO_STRINGS)
+    Bolt::PackStream.pack(BIG_MAP_OF_INTS_TO_STRINGS)
   end
 
   x.report("pack small list") do
-    Bolt::PackStream.pack_internal("".dup.force_encoding('BINARY'),SMALL_LIST)
+    Bolt::PackStream.pack(SMALL_LIST)
   end
 
   x.report("pack big list") do
-    Bolt::PackStream.pack_internal("".dup.force_encoding('BINARY'),LONG_LIST_OF_INTEGERS)
+    Bolt::PackStream.pack(LONG_LIST_OF_INTEGERS)
   end
 
   x.report("pack big list of floats") do
-    Bolt::PackStream.pack_internal("".dup.force_encoding('BINARY'),FLOATS)
+    Bolt::PackStream.pack(FLOATS)
   end
 
   x.report("pack big list of immediates") do
-    Bolt::PackStream.pack_internal("".dup.force_encoding('BINARY'),IMMEDIATES)
+    Bolt::PackStream.pack(IMMEDIATES)
   end
 
 end

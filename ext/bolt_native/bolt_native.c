@@ -6,7 +6,6 @@ VALUE rb_mBolt_packStream;
 VALUE rb_mBolt_structure;
 VALUE rb_mBolt_basic_structure;
 VALUE rb_mBolt_ByteBuffer;
-ID id_pack_internal;
 ID id_fields;
 ID id_signature;
 ID id_from_pack_stream;
@@ -73,14 +72,13 @@ Init_bolt_native(void)
 {
   rb_mBolt = rb_const_get(rb_cObject, rb_intern("Bolt"));
   rb_mBolt_packStream = rb_const_get(rb_mBolt, rb_intern("PackStream"));
-  id_pack_internal = rb_intern("pack_internal");
   id_signature = rb_intern("signature");
   id_fields = rb_intern("fields");
   id_from_pack_stream = rb_intern("from_pack_stream");
   rb_mBolt_structure = rb_const_get(rb_mBolt_packStream, rb_intern("Structure"));
   rb_mBolt_basic_structure = rb_const_get(rb_mBolt_packStream, rb_intern("BasicStruct"));
 
-  rb_define_singleton_method(rb_mBolt_packStream, "pack_internal", RUBY_METHOD_FUNC(rb_bolt_pack_internal),2);
+  rb_define_singleton_method(rb_mBolt_packStream, "pack", RUBY_METHOD_FUNC(rb_bolt_pack),-1);
 
   rb_mBolt_ByteBuffer = rb_const_get(rb_mBolt, rb_intern("ByteBuffer"));
 
@@ -112,17 +110,20 @@ Init_bolt_native(void)
 VALUE rb_native_extensions_loaded_p(VALUE self){
   return Qtrue;
 }
-
-VALUE rb_bolt_pack_internal(VALUE self, VALUE rb_buffer, VALUE item){
+VALUE rb_bolt_pack(int argc, VALUE *argv, VALUE self){
   WriteBuffer buffer;
   allocate(&buffer, 128);
-  pack_internal(&buffer, item);
-  rb_str_buf_cat(rb_buffer, (const char*)buffer.buffer, buffer.consumed);
+
+  for(int i=0; i<argc; i++){
+    bolt_pack(argv[i], &buffer);
+  }
+  VALUE rb_buffer = rb_str_new((const char*)buffer.buffer, buffer.consumed);
+
   deallocate(&buffer);
   return rb_buffer;
 }
 
-void pack_internal(WriteBuffer *buffer, VALUE item){
+void bolt_pack(VALUE item, WriteBuffer *buffer){
   switch(rb_type(item)){
     case T_BIGNUM:
     case T_FIXNUM:
@@ -226,8 +227,8 @@ void bolt_encode_double(VALUE rbfloat, WriteBuffer *buffer){
 
 static int encode_hash_iterator(VALUE key, VALUE val, VALUE _buffer){
   WriteBuffer *buffer = (WriteBuffer*)_buffer;
-  pack_internal(buffer, key);
-  pack_internal(buffer, val);
+  bolt_pack(key, buffer);
+  bolt_pack(val, buffer);
   return ST_CONTINUE;
 }
 
@@ -245,7 +246,7 @@ void bolt_encode_array(VALUE array, WriteBuffer *buffer) {
   long offset = 0;
   append_marker_and_length(0x90,0xD4, length, buffer);
   for(; offset < length ;offset++){
-    pack_internal(buffer, RARRAY_AREF(array,offset));
+    bolt_pack(RARRAY_AREF(array,offset), buffer);
   }  
 }
 
@@ -274,7 +275,7 @@ void bolt_encode_structure(VALUE structure, WriteBuffer *buffer) {
   append_marker_and_length(0xB0,0xDC, length, buffer);
   write_bytes(buffer,&signature_byte,1);
   for(long offset =0; offset < length ;offset++){
-    pack_internal(buffer, RARRAY_AREF(fields,offset));
+    bolt_pack(RARRAY_AREF(fields,offset), buffer);
   }  
 }
 

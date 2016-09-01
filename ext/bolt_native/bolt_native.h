@@ -14,9 +14,9 @@ typedef struct {
 
 void bolt_encode_integer(VALUE integer, WriteBuffer* buffer);
 
-VALUE rb_bolt_pack_internal(VALUE self, VALUE buffer, VALUE item);
+VALUE rb_bolt_pack(int argc, VALUE *argv, VALUE self);
 
-void pack_internal(WriteBuffer *buffer, VALUE item);
+void bolt_pack(VALUE item,WriteBuffer *buffer);
 void bolt_encode_array(VALUE array, WriteBuffer* buffer);
 void bolt_encode_hash(VALUE array, WriteBuffer* buffer);
 void bolt_encode_string(VALUE array, WriteBuffer* buffer);
