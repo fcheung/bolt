@@ -19,39 +19,39 @@ IMMEDIATES = [true, false, nil] * 65536
 Benchmark.ips do |x|
 
   x.report("unpack list of integers") do
-    Bolt::PackStream.unpack(LIST_OF_INTEGERS).next
+    Bolt::Unpacker.new(LIST_OF_INTEGERS).next_value
   end
 
   x.report("unpack long list of integers") do
-    Bolt::PackStream.unpack(LONG_LIST_OF_INTEGERS_DATA).next
+    Bolt::Unpacker.new(LONG_LIST_OF_INTEGERS_DATA).next_value
   end
 
   x.report("unpack map of strings") do
-    Bolt::PackStream.unpack(MAP_OF_STRINGS).next
+    Bolt::Unpacker.new(MAP_OF_STRINGS).next_value
   end
 
   x.report("unpack big map of strings") do
-    Bolt::PackStream.unpack(BIG_MAP_OF_INTS_TO_STRINGS_DATA).next
+    Bolt::Unpacker.new(BIG_MAP_OF_INTS_TO_STRINGS_DATA).next_value
   end
 
   x.report("pack big map of ints to strings") do
-    Bolt::PackStream.pack(BIG_MAP_OF_INTS_TO_STRINGS)
+    Bolt::PackStream.pack_internal("".dup.force_encoding('BINARY'),BIG_MAP_OF_INTS_TO_STRINGS)
   end
 
   x.report("pack small list") do
-    Bolt::PackStream.pack(SMALL_LIST)
+    Bolt::PackStream.pack_internal("".dup.force_encoding('BINARY'),SMALL_LIST)
   end
 
   x.report("pack big list") do
-    Bolt::PackStream.pack(LONG_LIST_OF_INTEGERS)
+    Bolt::PackStream.pack_internal("".dup.force_encoding('BINARY'),LONG_LIST_OF_INTEGERS)
   end
 
   x.report("pack big list of floats") do
-    Bolt::PackStream.pack(FLOATS)
+    Bolt::PackStream.pack_internal("".dup.force_encoding('BINARY'),FLOATS)
   end
 
   x.report("pack big list of immediates") do
-    Bolt::PackStream.pack(IMMEDIATES)
+    Bolt::PackStream.pack_internal("".dup.force_encoding('BINARY'),IMMEDIATES)
   end
 
 end
