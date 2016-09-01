@@ -164,19 +164,46 @@ module Bolt
     end
   end
 
+
+  # Allows deserialization of PackStream messages
+  # The majority of the methods in this class are replaced with native implementations where possible
+  #
   class ByteBuffer
     attr_accessor :registry
 
-    def initialize(string, registry)
+    #
+    # See {Bolt::PackStream.unpack} for a discussion of the arguments
+    #
+    # @param string - the data to decode
+    # @param registry - A hash of signature byte values to classes
+    def initialize(string, registry = nil)
       @data = string.freeze
       @offset = 0
       self.registry = registry
     end
 
+    #
+    # @return the next object from the string
+    # @raise If the string has been entirely consumed
     def next_value
       fetch_next_field
     end
 
+
+    #
+    # @return An array of all of the deserialized values
+    #
+    def to_a
+      result = []
+      while !at_end?
+        result << fetch_next_field
+      end
+      result
+    end
+
+    #
+    # Returns an enumerator that allows iterations over the values
+    #
     def enumerator
       Enumerator.new do |y|
         loop do
@@ -184,6 +211,13 @@ module Bolt
           break if at_end?
         end
       end
+    end
+
+    #
+    # Returns whether there is still data to be read or not
+    #
+    def at_end?
+      @offset == @data.bytesize
     end
 
     private
@@ -208,9 +242,7 @@ module Bolt
     def read_double; get_scalar(8, 'G'); end
 
 
-    def at_end?
-      @offset == @data.bytesize
-    end
+    
 
 
     def fetch_next_field

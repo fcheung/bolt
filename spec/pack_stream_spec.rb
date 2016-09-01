@@ -248,6 +248,23 @@ describe Bolt::PackStream do
     end
   end
 
+  describe Bolt::ByteBuffer do
+    describe 'to_a' do
+      it 'returns an array of the unpacked values' do
+        expect(Bolt::ByteBuffer.new("\x00\x7F\xF0\xC8\x80\xC9\x80\x00\xC9\x7F\xFF\xCA\x80\x00\x00\x00\xCB\x7F\xFF\xFF\xFF\xFF\xFF\xFF\xFF").to_a).to eq([
+          0, 127,
+          -16,
+          -128,
+          -32768,
+          32767,
+          -2_147_483_648,
+          9_223_372_036_854_775_807
+
+        ])
+      end
+    end
+  end
+
   describe 'unpack' do
     it 'rejects unknown marker bytes' do
       expect {Bolt::PackStream.unpack("\xCC").next}.to raise_error(ArgumentError)
