@@ -54,6 +54,12 @@ void deallocate(WriteBuffer *b){
   memset(b, 0, sizeof(WriteBuffer));
 }
 
+void write_byte(WriteBuffer *b, const uint8_t byte){
+  ensure_capacity(b, 1);
+  *(b->position++)= byte;
+  b->consumed++;
+}
+
 inline void write_bytes(WriteBuffer *b, const uint8_t *bytes, size_t size){
   ensure_capacity(b, size);
   memcpy(b->position, bytes, size);
@@ -115,13 +121,13 @@ void pack_internal(WriteBuffer *buffer, VALUE item){
       rb_bolt_encode_integer(rb_mBolt_packStream, item, buffer);
       break;
     case T_NIL:
-      write_bytes(buffer, (uint8_t*)"\xC0", 1);
+      write_byte(buffer, (uint8_t)'\xC0');
       break;
     case T_TRUE:
-      write_bytes(buffer, (uint8_t*)"\xC3", 1);
+      write_byte(buffer, (uint8_t)'\xC3');
       break;
     case T_FALSE:
-      write_bytes(buffer, (uint8_t*)"\xC2", 1);
+      write_byte(buffer, (uint8_t)'\xC2');
       break;
     case T_SYMBOL:
       bolt_encode_string(rb_sym_to_s(item), buffer);
