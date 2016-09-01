@@ -11,6 +11,7 @@ typedef struct {
 } WriteBuffer;
 
 
+
 void rb_bolt_encode_integer(VALUE self, VALUE integer, WriteBuffer* buffer);
 
 VALUE rb_bolt_pack_internal(VALUE self, VALUE buffer, VALUE item);
@@ -24,9 +25,9 @@ void bolt_encode_structure(VALUE structure, WriteBuffer* buffer);
 
 typedef struct {
   VALUE rb_buffer;
+  uint8_t *position;
+  uint8_t *end;
   VALUE rb_registry;
-  size_t offset;
-  size_t length;
 } ByteBuffer;
 
 uint8_t bolt_read_uint8(ByteBuffer *b);
