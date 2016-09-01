@@ -150,14 +150,20 @@ static inline void append_marker_and_length(uint8_t base_marker, uint8_t base_le
   buffer->consumed += header_size;
 }
 
+#pragma pack(1)
+typedef union {
+  uint64_t bytes;
+  double f;
+} FloatSwapper;
+#pragma pack()
 
 
 #pragma pack(1)
 typedef union {
   struct {
     uint8_t marker;
-    double d;
-  } s;
+    FloatSwapper d;
+  } swapper;
   uint8_t raw[9];
 } FloatHeader;
 #pragma pack()
@@ -167,12 +173,9 @@ typedef union {
 void bolt_encode_float(VALUE rbfloat, WriteBuffer *buffer){
   ensure_capacity(buffer,sizeof(FloatHeader));
   FloatHeader *f = (FloatHeader*)buffer->position;
-  f->s.marker = 0xC1;
-  f->s.d = RFLOAT_VALUE(rbfloat);
-  swap(f->raw[1], f->raw[8]);
-  swap(f->raw[2], f->raw[7]);
-  swap(f->raw[3], f->raw[6]);
-  swap(f->raw[4], f->raw[5]);
+  f->swapper.marker = 0xC1;
+  f->swapper.d.f = RFLOAT_VALUE(rbfloat);
+  f->swapper.d.bytes = htonll(f->swapper.d.bytes);
  
   buffer->position += sizeof(FloatHeader);
   buffer->consumed += sizeof(FloatHeader);
@@ -281,16 +284,8 @@ void rb_bolt_encode_integer(VALUE self, VALUE integer, WriteBuffer *buffer){
     header->four_byte.value = htonl((uint32_t)unsigned_value);
     length = 5;
   }else {
-    header->raw[0] = '\xCB';
-
-    header->raw[1] = (uint8_t)((unsigned_value >> 56)  & 0xFF);
-    header->raw[2] = (uint8_t)((unsigned_value >> 48)  & 0xFF);
-    header->raw[3] = (uint8_t)((unsigned_value >> 40)  & 0xFF);
-    header->raw[4] = (uint8_t)((unsigned_value >> 32)  & 0xFF);
-    header->raw[5] = (uint8_t)((unsigned_value >> 24)  & 0xFF);
-    header->raw[6] = (uint8_t)((unsigned_value >> 16)  & 0xFF);
-    header->raw[7] = (uint8_t)((unsigned_value >> 8)  & 0xFF);
-    header->raw[8] = (uint8_t)((unsigned_value)  & 0xFF);
+    header->eight_byte.marker = '\xCB';
+    header->eight_byte.value = htonll(unsigned_value);
     length = 9;
   }
   buffer->position += length;
