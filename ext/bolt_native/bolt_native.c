@@ -10,6 +10,8 @@ ID id_pack_internal;
 ID id_fields;
 ID id_signature;
 ID id_from_pack_stream;
+
+static rb_encoding * utf8;
 #pragma pack(1)
 typedef union {
   struct  {
@@ -101,7 +103,7 @@ Init_bolt_native(void)
 
   rb_define_method(rb_mBolt_ByteBuffer, "at_end?", RUBY_METHOD_FUNC(rb_bolt_at_end_p),0);
   rb_define_method(rb_mBolt_ByteBuffer, "fetch_next_field", RUBY_METHOD_FUNC(rb_bolt_fetch_next_field),0);
-
+  utf8 =rb_utf8_encoding();
 }
 
 
@@ -242,8 +244,8 @@ void bolt_encode_array(VALUE array, WriteBuffer *buffer) {
 }
 
 void bolt_encode_string(VALUE string, WriteBuffer *buffer) {
-  VALUE encoded = rb_str_encode(string, rb_enc_from_encoding(rb_utf8_encoding()),
-              0,Qnil);
+  VALUE encoded = rb_enc_get(string) == utf8 ?
+                  string : rb_str_encode(string, rb_enc_from_encoding(utf8), 0,Qnil);
   long length = RSTRING_LEN(encoded);
   append_marker_and_length(0x80,0xD0, length, buffer);
   write_bytes(buffer, (uint8_t*)RSTRING_PTR(encoded), RSTRING_LEN(encoded));
