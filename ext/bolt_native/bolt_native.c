@@ -4,6 +4,7 @@
 VALUE rb_mBolt;
 VALUE rb_mBolt_packStream;
 VALUE rb_mBolt_structure;
+VALUE rb_mBolt_ByteBuffer;
 ID id_pack_internal;
 ID id_fields;
 ID id_signature;
@@ -68,7 +69,30 @@ Init_bolt_native(void)
   rb_mBolt_structure = rb_const_get(rb_mBolt_packStream, rb_intern("Structure"));
 
   rb_define_singleton_method(rb_mBolt_packStream, "pack_internal", RUBY_METHOD_FUNC(rb_bolt_pack_internal),2);
+
+  rb_mBolt_ByteBuffer = rb_const_get(rb_mBolt, rb_intern("ByteBuffer"));
+
+  rb_define_alloc_func(rb_mBolt_ByteBuffer, rb_byte_buffer_allocate);
+  rb_define_method(rb_mBolt_ByteBuffer, "initialize", RUBY_METHOD_FUNC(rb_byte_buffer_initialize),1);
+
+  rb_define_method(rb_mBolt_ByteBuffer, "read_uint8", RUBY_METHOD_FUNC(rb_bolt_read_uint8),0);
+  rb_define_method(rb_mBolt_ByteBuffer, "read_uint16", RUBY_METHOD_FUNC(rb_bolt_read_uint16),0);
+  rb_define_method(rb_mBolt_ByteBuffer, "read_uint32", RUBY_METHOD_FUNC(rb_bolt_read_uint32),0);
+  rb_define_method(rb_mBolt_ByteBuffer, "read_uint64", RUBY_METHOD_FUNC(rb_bolt_read_uint64),0);
+
+  rb_define_method(rb_mBolt_ByteBuffer, "read_int8", RUBY_METHOD_FUNC(rb_bolt_read_int8),0);
+  rb_define_method(rb_mBolt_ByteBuffer, "read_int16", RUBY_METHOD_FUNC(rb_bolt_read_int16),0);
+  rb_define_method(rb_mBolt_ByteBuffer, "read_int32", RUBY_METHOD_FUNC(rb_bolt_read_int32),0);
+  rb_define_method(rb_mBolt_ByteBuffer, "read_int64", RUBY_METHOD_FUNC(rb_bolt_read_int64),0);
+
+  rb_define_method(rb_mBolt_ByteBuffer, "read_double", RUBY_METHOD_FUNC(rb_bolt_read_double),0);
+
+  rb_define_method(rb_mBolt_ByteBuffer, "read_string", RUBY_METHOD_FUNC(rb_bolt_read_string),1);
+
+  rb_define_method(rb_mBolt_ByteBuffer, "at_end?", RUBY_METHOD_FUNC(rb_bolt_at_end_p),0);
+
 }
+
 
 VALUE rb_bolt_pack_internal(VALUE self, VALUE rb_buffer, VALUE item){
   WriteBuffer buffer;
@@ -290,4 +314,178 @@ void rb_bolt_encode_integer(VALUE self, VALUE integer, WriteBuffer *buffer){
   }
   buffer->position += length;
   buffer->consumed += length;
+}
+
+VALUE rb_byte_buffer_allocate(VALUE klass){
+  ByteBuffer *buffer;
+  VALUE wrapped = Data_Make_Struct(rb_mBolt_ByteBuffer, ByteBuffer, rb_byte_buffer_mark, RUBY_DEFAULT_FREE, buffer);
+  buffer->offset = 0;
+  buffer->rb_buffer = Qnil;
+  buffer->length = 0;
+  return wrapped;
+}
+void rb_byte_buffer_mark(void *object){
+  ByteBuffer *buffer = (ByteBuffer*) object;
+  if(buffer->rb_buffer != Qnil){
+    rb_gc_mark(buffer->rb_buffer);
+  }
+}
+
+
+void bolt_check_buffer(ByteBuffer *object, size_t count){
+  if(object->offset + count > object->length){
+    rb_raise(rb_eArgError, "Tried to read %lu bytes from offset %lu from buffer sized %lu", count, object->offset, object->length );
+  }
+}
+
+uint8_t bolt_read_uint8(ByteBuffer *object){
+  bolt_check_buffer(object, 1);
+  uint8_t result = *(uint8_t*) (RSTRING_PTR(object->rb_buffer) + object->offset++);
+  return result;
+}
+
+VALUE rb_bolt_read_uint8(VALUE self){
+  ByteBuffer *buffer;
+  Data_Get_Struct(self, ByteBuffer, buffer);
+  return INT2FIX(bolt_read_uint8(buffer));
+}
+
+uint16_t bolt_read_uint16(ByteBuffer *object){
+  bolt_check_buffer(object, 2);
+  uint16_t result = *(uint16_t*) (RSTRING_PTR(object->rb_buffer) + object->offset);
+  object->offset +=2;
+  return ntohs(result);
+}
+
+VALUE rb_bolt_read_uint16(VALUE self){
+  ByteBuffer *buffer;
+  Data_Get_Struct(self, ByteBuffer, buffer);
+  return INT2FIX(bolt_read_uint16(buffer));
+}
+
+uint32_t bolt_read_uint32(ByteBuffer *object){
+  bolt_check_buffer(object, 4);
+  uint32_t result = *(uint32_t*) (RSTRING_PTR(object->rb_buffer) + object->offset);
+  object->offset +=4;
+  return ntohl(result);
+}
+
+VALUE rb_bolt_read_uint32(VALUE self){
+  ByteBuffer *buffer;
+  Data_Get_Struct(self, ByteBuffer, buffer);
+  return INT2FIX(bolt_read_uint32(buffer));
+}
+
+uint64_t bolt_read_uint64(ByteBuffer *object){
+  bolt_check_buffer(object, 8);
+  uint64_t result = *(uint64_t*) (RSTRING_PTR(object->rb_buffer) + object->offset);
+  object->offset += 8;
+  return ntohll(result);
+}
+
+VALUE rb_bolt_read_uint64(VALUE self){
+  ByteBuffer *buffer;
+  Data_Get_Struct(self, ByteBuffer, buffer);
+  return ULL2NUM(bolt_read_uint64(buffer));
+}
+
+
+int8_t bolt_read_int8(ByteBuffer *object){
+  bolt_check_buffer(object, 1);
+  int8_t result = *(int8_t*) (RSTRING_PTR(object->rb_buffer) + object->offset++);
+  return result;
+}
+
+VALUE rb_bolt_read_int8(VALUE self){
+  ByteBuffer *buffer;
+  Data_Get_Struct(self, ByteBuffer, buffer);
+  return INT2FIX(bolt_read_int8(buffer));
+}
+
+int16_t bolt_read_int16(ByteBuffer *object){
+  bolt_check_buffer(object, 2);
+  uint16_t result = *(uint16_t*) (RSTRING_PTR(object->rb_buffer) + object->offset);
+  object->offset +=2;
+  return (int16_t)ntohs(result);
+}
+
+VALUE rb_bolt_read_int16(VALUE self){
+  ByteBuffer *buffer;
+  Data_Get_Struct(self, ByteBuffer, buffer);
+  return INT2FIX(bolt_read_int16(buffer));
+}
+
+int32_t bolt_read_int32(ByteBuffer *object){
+  bolt_check_buffer(object, 4);
+  uint32_t result = *(uint32_t*) (RSTRING_PTR(object->rb_buffer) + object->offset);
+  object->offset +=4;
+  return (int32_t)ntohl(result);
+}
+
+VALUE rb_bolt_read_int32(VALUE self){
+  ByteBuffer *buffer;
+  Data_Get_Struct(self, ByteBuffer, buffer);
+  return INT2FIX(bolt_read_int32(buffer));
+}
+
+int64_t bolt_read_int64(ByteBuffer *object){
+  bolt_check_buffer(object, 8);
+  uint64_t result = *(uint64_t*) (RSTRING_PTR(object->rb_buffer) + object->offset);
+  object->offset += 8;
+  return (int64_t)ntohll(result);
+}
+
+VALUE rb_bolt_read_int64(VALUE self){
+  ByteBuffer *buffer;
+  Data_Get_Struct(self, ByteBuffer, buffer);
+  return LL2NUM(bolt_read_int64(buffer));
+}
+
+
+double bolt_read_double(ByteBuffer *object){
+  bolt_check_buffer(object, 8);
+  FloatSwapper result = *(FloatSwapper*) (RSTRING_PTR(object->rb_buffer) + object->offset);
+  result.bytes = ntohll(result.bytes);
+  object->offset += 8;
+  return result.f;
+}
+
+VALUE rb_bolt_read_double(VALUE self){
+  ByteBuffer *buffer;
+  Data_Get_Struct(self, ByteBuffer, buffer);
+  return DBL2NUM(bolt_read_double(buffer));
+}
+
+VALUE rb_bolt_read_string(VALUE self, VALUE rb_length){
+  long length = FIX2INT(rb_length);
+  ByteBuffer *buffer;
+  Data_Get_Struct(self, ByteBuffer, buffer);
+  bolt_check_buffer(buffer, length);
+  VALUE string = rb_enc_str_new(RSTRING_PTR(buffer->rb_buffer) + buffer->offset, length, rb_utf8_encoding());
+
+  buffer->offset += length;
+  return string;
+}
+
+VALUE rb_bolt_at_end_p(VALUE self){
+  ByteBuffer *buffer;
+  Data_Get_Struct(self, ByteBuffer, buffer);
+  if(buffer->offset == buffer->length){
+    return Qtrue;
+  }else{
+    return Qnil;
+  }
+}
+
+
+VALUE rb_byte_buffer_initialize(VALUE self, VALUE string){
+  ByteBuffer *buffer;
+  Check_Type(string, T_STRING);
+  Data_Get_Struct(self, ByteBuffer, buffer);
+
+  buffer->offset = 0;
+  RB_OBJ_FREEZE(string);
+  buffer->rb_buffer = string;
+  buffer->length = RSTRING_LEN(string);
+  return self;
 }
