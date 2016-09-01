@@ -244,6 +244,10 @@ module Bolt
       @data.registry = registry
     end
 
+    def next_value
+      @data.fetch_next_field
+    end
+
     def enumerator
       Enumerator.new do |y|
         loop do
