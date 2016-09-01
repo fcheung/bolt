@@ -163,7 +163,7 @@ module Bolt
     def read_int32; get_scalar(4, 'l>'); end
     def read_int64; get_scalar(8, 'q>'); end
 
-    def read_float; get_scalar(8, 'G'); end
+    def read_double; get_scalar(8, 'G'); end
 
 
     def at_end?
@@ -200,11 +200,10 @@ module Bolt
 
     def fetch_next_field
       marker = @data.read_uint8
-
       if marker < 0x80 then marker
       elsif marker >= 0xF0 then marker - 0x100 #the small negative ones - convert to signed byte
       elsif marker == 0xC0 then nil
-      elsif marker == 0xC1 then @data.read_float
+      elsif marker == 0xC1 then @data.read_double
       elsif marker == 0xC2 then false
       elsif marker == 0xC3 then true
       #ints
