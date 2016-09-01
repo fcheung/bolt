@@ -4,10 +4,12 @@
 VALUE rb_mBolt;
 VALUE rb_mBolt_packStream;
 VALUE rb_mBolt_structure;
+VALUE rb_mBolt_basic_structure;
 VALUE rb_mBolt_ByteBuffer;
 ID id_pack_internal;
 ID id_fields;
 ID id_signature;
+ID id_from_pack_stream;
 #pragma pack(1)
 typedef union {
   struct  {
@@ -66,7 +68,9 @@ Init_bolt_native(void)
   id_pack_internal = rb_intern("pack_internal");
   id_signature = rb_intern("signature");
   id_fields = rb_intern("fields");
+  id_from_pack_stream = rb_intern("from_pack_stream");
   rb_mBolt_structure = rb_const_get(rb_mBolt_packStream, rb_intern("Structure"));
+  rb_mBolt_basic_structure = rb_const_get(rb_mBolt_packStream, rb_intern("BasicStruct"));
 
   rb_define_singleton_method(rb_mBolt_packStream, "pack_internal", RUBY_METHOD_FUNC(rb_bolt_pack_internal),2);
 
@@ -90,6 +94,7 @@ Init_bolt_native(void)
   rb_define_method(rb_mBolt_ByteBuffer, "read_string", RUBY_METHOD_FUNC(rb_bolt_read_string),1);
 
   rb_define_method(rb_mBolt_ByteBuffer, "at_end?", RUBY_METHOD_FUNC(rb_bolt_at_end_p),0);
+  rb_define_method(rb_mBolt_ByteBuffer, "fetch_next_field", RUBY_METHOD_FUNC(rb_bolt_fetch_next_field),0);
 
 }
 
@@ -321,6 +326,7 @@ VALUE rb_byte_buffer_allocate(VALUE klass){
   VALUE wrapped = Data_Make_Struct(rb_mBolt_ByteBuffer, ByteBuffer, rb_byte_buffer_mark, RUBY_DEFAULT_FREE, buffer);
   buffer->offset = 0;
   buffer->rb_buffer = Qnil;
+  buffer->rb_registry = Qnil;
   buffer->length = 0;
   return wrapped;
 }
@@ -328,6 +334,9 @@ void rb_byte_buffer_mark(void *object){
   ByteBuffer *buffer = (ByteBuffer*) object;
   if(buffer->rb_buffer != Qnil){
     rb_gc_mark(buffer->rb_buffer);
+  }
+  if(buffer->rb_registry != Qnil){
+    rb_gc_mark(buffer->rb_registry);
   }
 }
 
@@ -460,11 +469,17 @@ VALUE rb_bolt_read_string(VALUE self, VALUE rb_length){
   long length = FIX2INT(rb_length);
   ByteBuffer *buffer;
   Data_Get_Struct(self, ByteBuffer, buffer);
+  return bolt_read_string(buffer, length);
+}
+
+VALUE bolt_read_string(ByteBuffer *buffer, long length)
+{
   bolt_check_buffer(buffer, length);
   VALUE string = rb_enc_str_new(RSTRING_PTR(buffer->rb_buffer) + buffer->offset, length, rb_utf8_encoding());
 
   buffer->offset += length;
   return string;
+
 }
 
 VALUE rb_bolt_at_end_p(VALUE self){
@@ -488,4 +503,98 @@ VALUE rb_byte_buffer_initialize(VALUE self, VALUE string){
   buffer->rb_buffer = string;
   buffer->length = RSTRING_LEN(string);
   return self;
+}
+
+VALUE rb_bolt_fetch_next_field(VALUE self){
+  ByteBuffer *buffer;
+  Data_Get_Struct(self, ByteBuffer, buffer);
+  buffer->rb_registry = rb_ivar_get(self, rb_intern("@registry"));
+  return bolt_fetch_next_field(buffer);
+}
+
+VALUE bolt_fetch_next_field(ByteBuffer *buffer){
+  uint8_t marker = bolt_read_uint8(buffer);
+  if(marker & 1<<7)
+  {
+    if(marker >= 0xF0){
+      return INT2FIX(marker - 0x100);
+    }
+    else {
+      if(marker & 1<< 6) {
+        switch(marker){
+          case 0xC0: return Qnil;
+          case 0xC1: return rb_float_new(bolt_read_double(buffer));
+          case 0xC2: return Qfalse;
+          case 0xC3: return Qtrue;
+          case 0xC8: return INT2FIX(bolt_read_int8(buffer));
+          case 0xC9: return INT2FIX(bolt_read_int16(buffer));
+          case 0xCA: return INT2FIX(bolt_read_int32(buffer));
+          case 0xCB: return LL2NUM(bolt_read_int64(buffer));
+      
+          case 0xD0: return bolt_read_string(buffer, bolt_read_uint8(buffer));
+          case 0xD1: return bolt_read_string(buffer, bolt_read_uint16(buffer));
+          case 0xD2: return bolt_read_string(buffer, bolt_read_uint32(buffer));
+
+          case 0xD4: return bolt_read_list(buffer, bolt_read_uint8(buffer));
+          case 0xD5: return bolt_read_list(buffer, bolt_read_uint16(buffer));
+          case 0xD6: return bolt_read_list(buffer, bolt_read_uint32(buffer));
+
+          case 0xD8: return bolt_read_map(buffer, bolt_read_uint8(buffer));
+          case 0xD9: return bolt_read_map(buffer, bolt_read_uint16(buffer));
+          case 0xDA: return bolt_read_map(buffer, bolt_read_uint32(buffer));
+
+          case 0xDC: return bolt_read_structure(buffer, bolt_read_uint8(buffer));
+          case 0xDD: return bolt_read_structure(buffer, bolt_read_uint16(buffer));
+
+          default:
+            rb_raise(rb_eArgError, "Unknown marker %x", marker);
+        }
+      }
+      else{
+        switch(marker & 0xF0) {
+          case 0x80: return bolt_read_string(buffer, marker & 0x0F);
+          case 0x90: return bolt_read_list(buffer, marker & 0x0F);
+          case 0xA0: return bolt_read_map(buffer, marker & 0x0F);
+          case 0xB0: return bolt_read_structure(buffer, marker & 0x0F);
+          default: /*small negative integer*/
+            rb_raise(rb_eArgError, "Unknown marker %x", marker);
+            break;
+        }
+      }
+    }
+  }
+  else { /*marker is <0x80 : this is an int*/
+    return INT2FIX(marker);
+  }
+}
+
+VALUE bolt_read_list(ByteBuffer * buffer, long length){
+  VALUE result = rb_ary_new_capa(length);
+  for(long i=0; i< length;i++){
+    rb_ary_push(result, bolt_fetch_next_field(buffer));
+  }
+  return result;
+}
+
+VALUE bolt_read_map(ByteBuffer * buffer, long length){
+  VALUE result = rb_hash_new();
+  for(long i=0; i< length;i++){
+    VALUE key = bolt_fetch_next_field(buffer);
+    VALUE value = bolt_fetch_next_field(buffer);
+    rb_hash_aset(result, key, value);
+  }
+  return result;
+}
+
+VALUE bolt_read_structure(ByteBuffer * buffer, long length){
+  int8_t signature = bolt_read_int8(buffer);
+  VALUE fields = bolt_read_list(buffer, length);
+  VALUE klass = rb_mBolt_basic_structure;
+  if(buffer->rb_registry != Qnil){
+    VALUE present = rb_hash_aref(buffer->rb_registry, INT2FIX(signature));
+    if(RTEST(present)){
+      klass = present;
+    }
+  }
+  return rb_funcall(klass, id_from_pack_stream, 2, INT2FIX(signature), fields);
 }
