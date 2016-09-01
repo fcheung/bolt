@@ -14,6 +14,8 @@ BIG_MAP_OF_INTS_TO_STRINGS = (1..65536).zip(['1']*65536).to_h
 BIG_MAP_OF_INTS_TO_STRINGS_DATA = Bolt::PackStream.pack(BIG_MAP_OF_INTS_TO_STRINGS)
 SMALL_LIST = [1, true, 3.14, "fünf"]
 FLOATS = [1.0]*65536
+
+IMMEDIATES = [true, false, nil] * 65536
 Benchmark.ips do |x|
 
   x.report("unpack list of integers") do
@@ -46,6 +48,10 @@ Benchmark.ips do |x|
 
   x.report("pack big list of floats") do
     Bolt::PackStream.pack(FLOATS)
+  end
+
+  x.report("pack big list of immediates") do
+    Bolt::PackStream.pack(IMMEDIATES)
   end
 
 end
