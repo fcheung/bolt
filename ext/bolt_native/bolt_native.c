@@ -482,7 +482,7 @@ VALUE rb_bolt_read_string(VALUE self, VALUE rb_length){
 VALUE bolt_read_string(ByteBuffer *buffer, long length)
 {
   bolt_check_buffer(buffer, length);
-  VALUE string = rb_enc_str_new((const char*)buffer->position, length, rb_utf8_encoding());
+  VALUE string = rb_utf8_str_new((const char*)buffer->position, length);
 
   buffer->position += length;
   return string;
