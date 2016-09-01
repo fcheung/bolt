@@ -98,7 +98,7 @@ void pack_internal(WriteBuffer *buffer, VALUE item){
       bolt_encode_string(rb_sym_to_s(item), buffer);
       break;
     case T_FLOAT:
-      bolt_encode_float(item, buffer);      
+      bolt_encode_double(item, buffer);      
       break;
     case T_HASH:
       bolt_encode_hash(item, buffer);
@@ -170,7 +170,7 @@ typedef union {
 
 #define swap(a, b) ((a)^=(b),(b)^=(a),(a)^=(b))
 
-void bolt_encode_float(VALUE rbfloat, WriteBuffer *buffer){
+void bolt_encode_double(VALUE rbfloat, WriteBuffer *buffer){
   ensure_capacity(buffer,sizeof(FloatHeader));
   FloatHeader *f = (FloatHeader*)buffer->position;
   f->swapper.marker = 0xC1;

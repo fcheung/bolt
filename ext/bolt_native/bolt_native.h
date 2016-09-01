@@ -19,7 +19,7 @@ void pack_internal(WriteBuffer *buffer, VALUE item);
 void bolt_encode_array(VALUE array, WriteBuffer* buffer);
 void bolt_encode_hash(VALUE array, WriteBuffer* buffer);
 void bolt_encode_string(VALUE array, WriteBuffer* buffer);
-void bolt_encode_float(VALUE rbfloat, WriteBuffer* buffer);
+void bolt_encode_double(VALUE rbfloat, WriteBuffer* buffer);
 void bolt_encode_structure(VALUE structure, WriteBuffer* buffer);
 
 #endif /* BOLT_NATIVE_H */
