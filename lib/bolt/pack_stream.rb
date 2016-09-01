@@ -141,6 +141,7 @@ module Bolt
   end
 
   class ByteBuffer
+    attr_accessor :registry
     def initialize(string)
       @data = string.freeze
       @offset = 0
@@ -170,6 +171,44 @@ module Bolt
       @offset == @data.bytesize
     end
 
+
+    def fetch_next_field
+      marker = read_uint8
+      if marker < 0x80 then marker
+      elsif marker >= 0xF0 then marker - 0x100 #the small negative ones - convert to signed byte
+      elsif marker == 0xC0 then nil
+      elsif marker == 0xC1 then read_double
+      elsif marker == 0xC2 then false
+      elsif marker == 0xC3 then true
+      #ints
+      elsif marker == 0xC8 then read_int8
+      elsif marker == 0xC9 then read_int16
+      elsif marker == 0xCA then read_int32
+      elsif marker == 0xCB then read_int64
+      #strings
+      elsif marker >= 0x80 && marker <= 0x8F then read_string(marker & 0x0F)
+      elsif marker == 0xD0 then read_string(read_uint8)
+      elsif marker == 0xD1 then read_string(read_uint16)
+      elsif marker == 0xD2 then read_string(read_uint32)
+      #lists
+      elsif marker >= 0x90 && marker <= 0x9F then get_list(marker & 0x0F)
+      elsif marker == 0xD4 then get_list(read_uint8)
+      elsif marker == 0xD5 then get_list(read_uint16)
+      elsif marker == 0xD6 then get_list(read_uint32)
+      #maps
+      elsif marker >= 0xA0 && marker <= 0xAF then get_map(marker & 0x0F)
+      elsif marker == 0xD8 then get_map(read_uint8)
+      elsif marker == 0xD9 then get_map(read_uint16)
+      elsif marker == 0xDA then get_map(read_uint32)
+      #structs
+      elsif marker >= 0xB0 && marker <= 0xBF then get_struct(marker & 0x0F)
+      elsif marker == 0xDC then get_struct(read_uint8)
+      elsif marker == 0xDD then get_struct(read_uint16)
+      else
+        raise ArgumentError, "Unknown marker #{marker.to_s(16)}"
+      end
+    end     
+
     private
     def get_scalar(length, pattern)
       data = @data.byteslice(@offset, length)
@@ -178,62 +217,7 @@ module Bolt
       @offset += length
       scalar
     end
-
-  end
-
-  class Unpacker
-
-
-    def initialize(data, registry: nil)
-      @data = ByteBuffer.new(data)
-      @registry = registry
-    end
-
-    def enumerator
-      Enumerator.new do |y|
-        loop do
-          y << fetch_next_field
-          break if @data.at_end?
-        end
-      end
-    end
-
-    def fetch_next_field
-      marker = @data.read_uint8
-      if marker < 0x80 then marker
-      elsif marker >= 0xF0 then marker - 0x100 #the small negative ones - convert to signed byte
-      elsif marker == 0xC0 then nil
-      elsif marker == 0xC1 then @data.read_double
-      elsif marker == 0xC2 then false
-      elsif marker == 0xC3 then true
-      #ints
-      elsif marker == 0xC8 then @data.read_int8
-      elsif marker == 0xC9 then @data.read_int16
-      elsif marker == 0xCA then @data.read_int32
-      elsif marker == 0xCB then @data.read_int64
-      #strings
-      elsif marker >= 0x80 && marker <= 0x8F then @data.read_string(marker & 0x0F)
-      elsif marker == 0xD0 then @data.read_string(@data.read_uint8)
-      elsif marker == 0xD1 then @data.read_string(@data.read_uint16)
-      elsif marker == 0xD2 then @data.read_string(@data.read_uint32)
-      #lists
-      elsif marker >= 0x90 && marker <= 0x9F then get_list(marker & 0x0F)
-      elsif marker == 0xD4 then get_list(@data.read_uint8)
-      elsif marker == 0xD5 then get_list(@data.read_uint16)
-      elsif marker == 0xD6 then get_list(@data.read_uint32)
-      #maps
-      elsif marker >= 0xA0 && marker <= 0xAF then get_map(marker & 0x0F)
-      elsif marker == 0xD8 then get_map(@data.read_uint8)
-      elsif marker == 0xD9 then get_map(@data.read_uint16)
-      elsif marker == 0xDA then get_map(@data.read_uint32)
-      #structs
-      elsif marker >= 0xB0 && marker <= 0xBF then get_struct(marker & 0x0F)
-      elsif marker == 0xDC then get_struct(@data.read_uint8)
-      elsif marker == 0xDD then get_struct(@data.read_uint16)
-      else
-        raise ArgumentError, "Unknown marker #{marker.to_s(16)}"
-      end
-    end      
+ 
     private
 
     def get_list(length)
@@ -245,12 +229,29 @@ module Bolt
     end
 
     def get_struct(length)
-      signature = @data.read_int8
+      signature = read_int8
       klass = (@registry && @registry[signature]) || Bolt::PackStream::BasicStruct 
       klass.from_pack_stream(signature, get_list(length))
     end
 
-  
+  end
+
+  class Unpacker
+
+
+    def initialize(data, registry: nil)
+      @data = ByteBuffer.new(data)
+      @data.registry = registry
+    end
+
+    def enumerator
+      Enumerator.new do |y|
+        loop do
+          y << @data.fetch_next_field
+          break if @data.at_end?
+        end
+      end
+    end
 
 
   end
