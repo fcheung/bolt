@@ -101,7 +101,7 @@ Init_bolt_native(void)
 
 VALUE rb_bolt_pack_internal(VALUE self, VALUE rb_buffer, VALUE item){
   WriteBuffer buffer;
-  allocate(&buffer, 16);
+  allocate(&buffer, 128);
   pack_internal(&buffer, item);
   rb_str_buf_cat(rb_buffer, (const char*)buffer.buffer, buffer.consumed);
   deallocate(&buffer);
