@@ -67,4 +67,6 @@ VALUE rb_byte_buffer_allocate(VALUE);
 VALUE bolt_read_list(ByteBuffer * buffer, long length);
 VALUE bolt_read_map(ByteBuffer * buffer, long length);
 VALUE bolt_read_structure(ByteBuffer * buffer, long length);
+
+VALUE rb_native_extensions_loaded_p(VALUE);
 #endif /* BOLT_NATIVE_H */

@@ -53,11 +53,15 @@ describe Bolt::PackStream do
         expect(Bolt::PackStream.pack('A'*65536)).to match_hex('D2:00:01:00:00' + ':41' * 65536 )
       end
 
-      it "raises error if length >= 2^32 " do
-        input = 'dummy'
-        expect(input).to receive(:bytesize).and_return(2**32)
-        allow(input).to receive(:encode).and_return(input)
-        expect {Bolt::PackStream.pack(input)}.to raise_error(RangeError)
+      #when these methods are implemented in C we can't
+      #stub the bytesize method
+      unless Bolt.native_extensions_loaded?
+        it "raises error if length >= 2^32 " do
+          input = 'dummy'
+          expect(input).to receive(:bytesize).and_return(2**32)
+          allow(input).to receive(:encode).and_return(input)
+          expect {Bolt::PackStream.pack(input)}.to raise_error(RangeError)
+        end
       end
 
       it 'converts non utf 8 to utf 8' do
@@ -91,10 +95,14 @@ describe Bolt::PackStream do
         expect(Bolt::PackStream.pack([1]*65536)).to match_hex('D6:00:01:00:00' + ':01' * 65536 )
       end
 
-      it "raises error if length >= 2^32 " do
-        input = []
-        expect(input).to receive(:length).and_return(2**32)
-        expect {Bolt::PackStream.pack(input)}.to raise_error(RangeError)
+      #when these methods are implemented in C we can't
+      #stub the length method
+      unless Bolt.native_extensions_loaded?
+        it "raises error if length >= 2^32 " do
+          input = []
+          expect(input).to receive(:length).and_return(2**32)
+          expect {Bolt::PackStream.pack(input)}.to raise_error(RangeError)
+        end
       end
 
       it 'allows heterogenous lists' do
@@ -124,10 +132,14 @@ describe Bolt::PackStream do
         expect(Bolt::PackStream.pack(map)[0,11]).to match_hex('DA:00:01:00:00' + ':01:81:31:02:81:31' )
       end
 
-      it "raises error if size >= 2^32 " do
-        input = {}
-        expect(input).to receive(:size).and_return(2**32)
-        expect {Bolt::PackStream.pack(input)}.to raise_error(RangeError)
+      #when these methods are implemented in C we can't
+      #stub the length method
+      unless Bolt.native_extensions_loaded?
+        it "raises error if size >= 2^32 " do
+          input = {}
+          expect(input).to receive(:size).and_return(2**32)
+          expect {Bolt::PackStream.pack(input)}.to raise_error(RangeError)
+        end
       end
 
     end

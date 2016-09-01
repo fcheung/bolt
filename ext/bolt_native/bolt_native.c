@@ -104,8 +104,14 @@ Init_bolt_native(void)
   rb_define_method(rb_mBolt_ByteBuffer, "at_end?", RUBY_METHOD_FUNC(rb_bolt_at_end_p),0);
   rb_define_method(rb_mBolt_ByteBuffer, "fetch_next_field", RUBY_METHOD_FUNC(rb_bolt_fetch_next_field),0);
   utf8 =rb_utf8_encoding();
+
+  rb_define_singleton_method(rb_mBolt, "native_extensions_loaded?", RUBY_METHOD_FUNC(rb_native_extensions_loaded_p),0);
+
 }
 
+VALUE rb_native_extensions_loaded_p(VALUE self){
+  return Qtrue;
+}
 
 VALUE rb_bolt_pack_internal(VALUE self, VALUE rb_buffer, VALUE item){
   WriteBuffer buffer;
