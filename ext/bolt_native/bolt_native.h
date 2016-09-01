@@ -12,7 +12,7 @@ typedef struct {
 
 
 
-void rb_bolt_encode_integer(VALUE self, VALUE integer, WriteBuffer* buffer);
+void bolt_encode_integer(VALUE integer, WriteBuffer* buffer);
 
 VALUE rb_bolt_pack_internal(VALUE self, VALUE buffer, VALUE item);
 

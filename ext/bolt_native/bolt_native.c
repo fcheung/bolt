@@ -126,7 +126,7 @@ void pack_internal(WriteBuffer *buffer, VALUE item){
   switch(rb_type(item)){
     case T_BIGNUM:
     case T_FIXNUM:
-      rb_bolt_encode_integer(rb_mBolt_packStream, item, buffer);
+      bolt_encode_integer(item, buffer);
       break;
     case T_NIL:
       write_byte(buffer, (uint8_t)'\xC0');
@@ -303,7 +303,7 @@ typedef union {
 #pragma pack()
 
 
-void rb_bolt_encode_integer(VALUE self, VALUE integer, WriteBuffer *buffer){
+void bolt_encode_integer(VALUE integer, WriteBuffer *buffer){
   size_t length=0;
   ensure_capacity(buffer,sizeof(IntHeader));
   long long value = NUM2LL(integer);
